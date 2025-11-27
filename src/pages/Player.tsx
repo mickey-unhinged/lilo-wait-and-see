@@ -47,6 +47,7 @@ const Player = () => {
   const { isLiked, toggleLike } = useLikedSongs();
   const [bars, setBars] = useState<number[]>(Array(40).fill(0.5));
   const [showQueue, setShowQueue] = useState(false);
+  const [showLyrics, setShowLyrics] = useState(false);
   
   // Auto-play first demo track if no track is loaded
   useEffect(() => {
@@ -180,40 +181,56 @@ const Player = () => {
           </DropdownMenu>
         </header>
         
-        {/* Album art with visualizer */}
-        <div className="flex-1 flex items-center justify-center px-8 py-6">
-          <div className="relative w-full max-w-sm aspect-square">
-            {/* Glow effect */}
-            <div 
-              className={cn(
-                "absolute inset-0 rounded-3xl transition-opacity duration-500",
-                isPlaying ? "opacity-100" : "opacity-50"
+        {/* Album art with visualizer and lyrics side by side */}
+        <div className="flex-1 flex items-center justify-center px-4 py-6">
+          <div className={cn(
+            "flex items-center justify-center gap-4 w-full max-w-4xl transition-all duration-300",
+            showLyrics ? "flex-row" : "flex-col"
+          )}>
+            {/* Album art container */}
+            <div className={cn(
+              "relative transition-all duration-300",
+              showLyrics ? "w-48 h-48 md:w-64 md:h-64 flex-shrink-0" : "w-full max-w-sm aspect-square"
+            )}>
+              {/* Glow effect */}
+              <div 
+                className={cn(
+                  "absolute inset-0 rounded-3xl transition-opacity duration-500",
+                  isPlaying ? "opacity-100" : "opacity-50"
+                )}
+                style={{
+                  boxShadow: `0 0 100px 20px hsl(${dominantColor} / 0.3)`
+                }}
+              />
+              
+              {/* Album cover */}
+              <img
+                src={coverUrl}
+                alt={track?.title || "Album art"}
+                className={cn(
+                  "relative w-full h-full object-cover rounded-3xl shadow-2xl transition-all duration-500",
+                  isLoading && "animate-pulse"
+                )}
+              />
+              
+              {/* Visualizer overlay */}
+              {isPlaying && !showLyrics && (
+                <div className="absolute inset-x-0 bottom-0 h-24 flex items-end justify-center gap-0.5 px-6 pb-4">
+                  {bars.map((height, i) => (
+                    <div
+                      key={i}
+                      className="w-1 bg-white/60 rounded-full transition-all duration-100"
+                      style={{ height: `${height * 100}%` }}
+                    />
+                  ))}
+                </div>
               )}
-              style={{
-                boxShadow: `0 0 100px 20px hsl(${dominantColor} / 0.3)`
-              }}
-            />
-            
-            {/* Album cover */}
-            <img
-              src={coverUrl}
-              alt={track?.title || "Album art"}
-              className={cn(
-                "relative w-full h-full object-cover rounded-3xl shadow-2xl transition-all duration-500",
-                isLoading && "animate-pulse"
-              )}
-            />
-            
-            {/* Visualizer overlay */}
-            {isPlaying && (
-              <div className="absolute inset-x-0 bottom-0 h-24 flex items-end justify-center gap-0.5 px-6 pb-4">
-                {bars.map((height, i) => (
-                  <div
-                    key={i}
-                    className="w-1 bg-white/60 rounded-full transition-all duration-100"
-                    style={{ height: `${height * 100}%` }}
-                  />
-                ))}
+            </div>
+
+            {/* Lyrics panel - shown inline when active */}
+            {showLyrics && (
+              <div className="flex-1 h-48 md:h-64 min-w-0 bg-card/30 rounded-2xl backdrop-blur-sm border border-border/20 overflow-hidden">
+                <LyricsPanel title={track?.title} artist={track?.artist_name} />
               </div>
             )}
           </div>
@@ -239,24 +256,20 @@ const Player = () => {
             </div>
           </div>
           
-          {/* Lyrics & Video buttons - Spotify style */}
+          {/* Lyrics & Video buttons */}
           <div className="flex items-center gap-2 mt-4">
-            <Sheet>
-              <SheetTrigger asChild>
-                <button className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/40 hover:bg-muted/60 text-sm font-medium transition-colors">
-                  <Music2 className="w-4 h-4" />
-                  Lyrics
-                </button>
-              </SheetTrigger>
-              <SheetContent side="bottom" className="h-[70vh] rounded-t-3xl">
-                <SheetHeader className="pb-4">
-                  <SheetTitle className="text-center">Lyrics</SheetTitle>
-                </SheetHeader>
-                <div className="h-[calc(100%-4rem)]">
-                  <LyricsPanel title={track?.title} artist={track?.artist_name} />
-                </div>
-              </SheetContent>
-            </Sheet>
+            <button 
+              onClick={() => setShowLyrics(!showLyrics)}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors",
+                showLyrics 
+                  ? "bg-primary text-primary-foreground" 
+                  : "bg-muted/40 hover:bg-muted/60"
+              )}
+            >
+              <Music2 className="w-4 h-4" />
+              Lyrics
+            </button>
             
             {track?.videoId && (
               <Sheet>
