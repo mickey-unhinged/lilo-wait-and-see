@@ -1,10 +1,13 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Play, Shuffle, Heart, MoreHorizontal, Clock, Music } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ArrowLeft, Play, Shuffle, Heart, MoreHorizontal, Clock, Music, Users } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { usePlayer, Track } from "@/contexts/PlayerContext";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { CollaboratorInvite } from "@/components/playlist/CollaboratorInvite";
+import { Switch } from "@/components/ui/switch";
 
 const formatDuration = (ms: number) => {
   const minutes = Math.floor(ms / 60000);
@@ -16,9 +19,17 @@ const Playlist = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { currentTrack, isPlaying, playTrack, setQueue } = usePlayer();
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isCollaborative, setIsCollaborative] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setCurrentUserId(user?.id || null);
+    });
+  }, []);
   
   // Fetch playlist from database
-  const { data: playlist, isLoading: playlistLoading } = useQuery({
+  const { data: playlist, isLoading: playlistLoading, refetch: refetchPlaylist } = useQuery({
     queryKey: ["playlist", id],
     queryFn: async () => {
       if (!id) return null;
@@ -30,10 +41,29 @@ const Playlist = () => {
         .maybeSingle();
       
       if (error) throw error;
+      if (data) {
+        setIsCollaborative(data.is_collaborative || false);
+      }
       return data;
     },
     enabled: !!id && id !== "liked",
   });
+
+  const isOwner = currentUserId && playlist?.owner_id === currentUserId;
+
+  const toggleCollaborative = async () => {
+    if (!id || !isOwner) return;
+    
+    const newValue = !isCollaborative;
+    setIsCollaborative(newValue);
+    
+    await supabase
+      .from("playlists")
+      .update({ is_collaborative: newValue })
+      .eq("id", id);
+      
+    refetchPlaylist();
+  };
 
   // Fetch playlist tracks
   const { data: playlistTracks, isLoading: tracksLoading } = useQuery({
@@ -180,6 +210,23 @@ const Playlist = () => {
               <Shuffle className="w-6 h-6" />
             </button>
           </div>
+
+          {/* Collaborative controls */}
+          {!isLikedSongs && isOwner && (
+            <div className="flex items-center justify-center gap-6 mt-6 pt-4 border-t border-border/30">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Collaborative</span>
+                <Switch 
+                  checked={isCollaborative}
+                  onCheckedChange={toggleCollaborative}
+                />
+              </div>
+              {isCollaborative && id && (
+                <CollaboratorInvite playlistId={id} isOwner={true} />
+              )}
+            </div>
+          )}
         </div>
       </div>
       

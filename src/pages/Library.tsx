@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { cn } from "@/lib/utils";
 import { Watermark } from "@/components/common/Watermark";
+import { PlaylistInvitations } from "@/components/playlist/PlaylistInvitations";
 
 type ViewMode = "grid" | "list";
 type FilterType = "all" | "playlists" | "albums" | "artists" | "podcasts";
@@ -98,6 +99,9 @@ const Library = () => {
   return (
     <AppLayout>
       <div className="px-4 pt-12 pb-4">
+        {/* Playlist Invitations */}
+        <PlaylistInvitations />
+        
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold font-display">Your Library</h1>

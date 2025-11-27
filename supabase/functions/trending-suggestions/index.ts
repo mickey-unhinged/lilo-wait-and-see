@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 // YouTube Music internal API endpoint
-const YT_MUSIC_API = "https://music.youtube.com/youtubei/v1/browse";
+const YT_MUSIC_API = "https://music.youtube.com/youtubei/v1";
 
 interface Track {
   id: string;
@@ -20,7 +20,7 @@ interface Track {
 
 async function fetchTrendingFromYouTubeMusic(): Promise<Track[]> {
   try {
-    const response = await fetch(`${YT_MUSIC_API}?key=AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30`, {
+    const response = await fetch(`${YT_MUSIC_API}/browse?key=AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -96,6 +96,78 @@ async function fetchTrendingFromYouTubeMusic(): Promise<Track[]> {
   }
 }
 
+// Search for tracks based on artist or genre
+async function searchYouTubeMusic(query: string): Promise<Track[]> {
+  try {
+    const response = await fetch(`${YT_MUSIC_API}/search?key=AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Origin": "https://music.youtube.com",
+        "Referer": "https://music.youtube.com/",
+      },
+      body: JSON.stringify({
+        context: {
+          client: {
+            clientName: "WEB_REMIX",
+            clientVersion: "1.20231204.01.00",
+            hl: "en",
+            gl: "US",
+          },
+        },
+        query: query,
+        params: "EgWKAQIIAWoKEAMQBBAJEAoQBQ%3D%3D", // Filter for songs
+      }),
+    });
+
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    const tracks: Track[] = [];
+
+    const contents = data?.contents?.tabbedSearchResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents;
+    
+    if (contents) {
+      for (const section of contents) {
+        const musicShelf = section?.musicShelfRenderer;
+        if (musicShelf?.contents) {
+          for (const item of musicShelf.contents) {
+            const flexColumns = item?.musicResponsiveListItemRenderer?.flexColumns;
+            if (flexColumns) {
+              try {
+                const title = flexColumns[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.text;
+                const artist = flexColumns[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.text;
+                const videoId = item?.musicResponsiveListItemRenderer?.overlay?.musicItemThumbnailOverlayRenderer?.content?.musicPlayButtonRenderer?.playNavigationEndpoint?.watchEndpoint?.videoId;
+                const thumbnail = item?.musicResponsiveListItemRenderer?.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails?.slice(-1)?.[0]?.url;
+
+                if (title && artist && videoId) {
+                  tracks.push({
+                    id: videoId,
+                    title,
+                    artist_id: videoId,
+                    artist_name: artist,
+                    cover_url: thumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+                    duration_ms: 180000,
+                    videoId,
+                  });
+                }
+              } catch (e) {
+                // Skip malformed items
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return tracks.slice(0, 10);
+  } catch (error) {
+    console.error("Failed to search YouTube Music:", error);
+    return [];
+  }
+}
+
 // Fallback: fetch popular music from Piped API
 async function fetchFromPiped(): Promise<Track[]> {
   const instances = [
@@ -145,25 +217,69 @@ serve(async (req) => {
   }
 
   try {
-    console.log("Fetching trending suggestions...");
-
-    // Try YouTube Music first, then Piped as fallback
-    let tracks = await fetchTrendingFromYouTubeMusic();
-    
-    if (tracks.length === 0) {
-      console.log("YouTube Music failed, trying Piped...");
-      tracks = await fetchFromPiped();
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      // No body provided, use defaults
     }
 
-    console.log(`Found ${tracks.length} trending tracks`);
+    const { type, seedArtists, seedGenres, limit = 20 } = body;
 
-    return new Response(JSON.stringify({ tracks }), {
+    console.log("Fetching suggestions...", { type, seedArtists, seedGenres });
+
+    let tracks: Track[] = [];
+
+    if (type === "personalized" && (seedArtists?.length > 0 || seedGenres?.length > 0)) {
+      // Personalized recommendations based on user's listening history
+      const queries = seedArtists?.length > 0 
+        ? seedArtists.map((a: string) => `${a} songs`)
+        : seedGenres.map((g: string) => `${g} music 2024`);
+
+      // Search for each artist/genre and combine results
+      const allTracks: Track[] = [];
+      for (const query of queries.slice(0, 3)) {
+        const results = await searchYouTubeMusic(query);
+        allTracks.push(...results);
+      }
+
+      // Shuffle and dedupe
+      const seen = new Set<string>();
+      tracks = allTracks.filter(t => {
+        if (seen.has(t.id)) return false;
+        seen.add(t.id);
+        return true;
+      }).sort(() => Math.random() - 0.5).slice(0, limit);
+
+      // If not enough personalized results, add some trending
+      if (tracks.length < limit / 2) {
+        const trending = await fetchTrendingFromYouTubeMusic();
+        for (const t of trending) {
+          if (!seen.has(t.id)) {
+            tracks.push(t);
+            if (tracks.length >= limit) break;
+          }
+        }
+      }
+    } else {
+      // Default: fetch trending
+      tracks = await fetchTrendingFromYouTubeMusic();
+      
+      if (tracks.length === 0) {
+        console.log("YouTube Music failed, trying Piped...");
+        tracks = await fetchFromPiped();
+      }
+    }
+
+    console.log(`Found ${tracks.length} tracks`);
+
+    return new Response(JSON.stringify({ tracks: tracks.slice(0, limit) }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("Trending suggestions error:", error);
+    console.error("Suggestions error:", error);
     return new Response(
-      JSON.stringify({ error: "Failed to fetch trending", tracks: [] }),
+      JSON.stringify({ error: "Failed to fetch suggestions", tracks: [] }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
