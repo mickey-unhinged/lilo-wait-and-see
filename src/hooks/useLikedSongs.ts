@@ -3,9 +3,16 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Track } from "@/contexts/PlayerContext";
 
 const LOCAL_STORAGE_KEY = "lilo-liked-songs";
+const LOCAL_TRACKS_KEY = "lilo-liked-tracks-data";
+
+interface StoredTrack {
+  track: Track;
+  likedAt: string;
+}
 
 export function useLikedSongs() {
   const [likedTrackIds, setLikedTrackIds] = useState<Set<string>>(new Set());
+  const [likedTracks, setLikedTracks] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -24,18 +31,58 @@ export function useLikedSongs() {
 
   // Load likes from localStorage on mount
   useEffect(() => {
-    const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setLikedTrackIds(new Set(parsed));
-      } catch (e) {
-        console.error("Failed to parse liked songs from localStorage:", e);
-      }
-    }
+    loadFromLocalStorage();
   }, []);
 
-  // Fetch liked songs from Supabase when user changes (for tracks that exist in DB)
+  const loadFromLocalStorage = () => {
+    try {
+      const storedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
+      const storedTracks = localStorage.getItem(LOCAL_TRACKS_KEY);
+      
+      if (storedIds) {
+        setLikedTrackIds(new Set(JSON.parse(storedIds)));
+      }
+      
+      if (storedTracks) {
+        const parsed: StoredTrack[] = JSON.parse(storedTracks);
+        // Sort by likedAt descending (most recent first)
+        parsed.sort((a, b) => new Date(b.likedAt).getTime() - new Date(a.likedAt).getTime());
+        setLikedTracks(parsed.map(p => p.track));
+      }
+    } catch (e) {
+      console.error("Failed to parse liked songs from localStorage:", e);
+    }
+  };
+
+  const saveToLocalStorage = (ids: Set<string>, tracks: Track[]) => {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(Array.from(ids)));
+      
+      // Save track data with timestamps
+      const existing = localStorage.getItem(LOCAL_TRACKS_KEY);
+      let storedTracks: StoredTrack[] = existing ? JSON.parse(existing) : [];
+      
+      // Update stored tracks to match current ids
+      const currentIds = Array.from(ids);
+      
+      // Remove tracks that are no longer liked
+      storedTracks = storedTracks.filter(st => currentIds.includes(st.track.id));
+      
+      // Add new tracks that aren't in storage yet
+      const storedIds = storedTracks.map(st => st.track.id);
+      for (const track of tracks) {
+        if (!storedIds.includes(track.id)) {
+          storedTracks.push({ track, likedAt: new Date().toISOString() });
+        }
+      }
+      
+      localStorage.setItem(LOCAL_TRACKS_KEY, JSON.stringify(storedTracks));
+    } catch (e) {
+      console.error("Failed to save to localStorage:", e);
+    }
+  };
+
+  // Fetch liked songs from Supabase when user changes
   useEffect(() => {
     if (!userId) return;
 
@@ -76,26 +123,26 @@ export function useLikedSongs() {
     const isExternalTrack = track.id.startsWith("ytm-") || track.id.startsWith("itunes-");
     const useLocalStorage = !userId || isExternalTrack;
 
+    let newIsLiked = !isCurrentlyLiked;
+
     if (useLocalStorage) {
       // Handle locally
-      const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
-      let localLikes: string[] = [];
-      try {
-        localLikes = stored ? JSON.parse(stored) : [];
-      } catch (e) {
-        localLikes = [];
-      }
+      let newIds: Set<string>;
+      let newTracks: Track[];
       
-      let newLikes: string[];
       if (isCurrentlyLiked) {
-        newLikes = localLikes.filter((id: string) => id !== track.id);
+        newIds = new Set(likedTrackIds);
+        newIds.delete(track.id);
+        newTracks = likedTracks.filter(t => t.id !== track.id);
       } else {
-        newLikes = [...localLikes.filter(id => id !== track.id), track.id];
+        newIds = new Set([...likedTrackIds, track.id]);
+        newTracks = [track, ...likedTracks.filter(t => t.id !== track.id)];
       }
       
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newLikes));
-      setLikedTrackIds(new Set(newLikes));
-      return !isCurrentlyLiked;
+      setLikedTrackIds(newIds);
+      setLikedTracks(newTracks);
+      saveToLocalStorage(newIds, newTracks);
+      return newIsLiked;
     }
 
     // For database tracks when logged in, use Supabase
@@ -109,11 +156,13 @@ export function useLikedSongs() {
 
         if (error) throw error;
         
-        setLikedTrackIds(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(track.id);
-          return newSet;
-        });
+        const newIds = new Set(likedTrackIds);
+        newIds.delete(track.id);
+        const newTracks = likedTracks.filter(t => t.id !== track.id);
+        
+        setLikedTrackIds(newIds);
+        setLikedTracks(newTracks);
+        saveToLocalStorage(newIds, newTracks);
         return false;
       } else {
         const { error } = await supabase
@@ -122,35 +171,39 @@ export function useLikedSongs() {
 
         if (error) throw error;
         
-        setLikedTrackIds(prev => new Set([...prev, track.id]));
+        const newIds = new Set([...likedTrackIds, track.id]);
+        const newTracks = [track, ...likedTracks.filter(t => t.id !== track.id)];
+        
+        setLikedTrackIds(newIds);
+        setLikedTracks(newTracks);
+        saveToLocalStorage(newIds, newTracks);
         return true;
       }
     } catch (err) {
       console.error("Failed to toggle like in database, falling back to localStorage:", err);
       // Fallback to localStorage on error
-      const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
-      let localLikes: string[] = [];
-      try {
-        localLikes = stored ? JSON.parse(stored) : [];
-      } catch (e) {
-        localLikes = [];
-      }
+      let newIds: Set<string>;
+      let newTracks: Track[];
       
-      let newLikes: string[];
       if (isCurrentlyLiked) {
-        newLikes = localLikes.filter((id: string) => id !== track.id);
+        newIds = new Set(likedTrackIds);
+        newIds.delete(track.id);
+        newTracks = likedTracks.filter(t => t.id !== track.id);
       } else {
-        newLikes = [...localLikes.filter(id => id !== track.id), track.id];
+        newIds = new Set([...likedTrackIds, track.id]);
+        newTracks = [track, ...likedTracks.filter(t => t.id !== track.id)];
       }
       
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newLikes));
-      setLikedTrackIds(new Set(newLikes));
-      return !isCurrentlyLiked;
+      setLikedTrackIds(newIds);
+      setLikedTracks(newTracks);
+      saveToLocalStorage(newIds, newTracks);
+      return newIsLiked;
     }
-  }, [userId, likedTrackIds]);
+  }, [userId, likedTrackIds, likedTracks]);
 
   return {
     likedTrackIds,
+    likedTracks,
     isLiked,
     toggleLike,
     isLoading,
