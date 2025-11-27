@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useRef, useEffect, ReactNode, useCallback } from "react";
+import * as React from "react";
+import { createContext, useContext, useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface Track {
@@ -56,7 +57,7 @@ export function usePlayer() {
 }
 
 interface PlayerProviderProps {
-  children: ReactNode;
+  children: React.ReactNode;
 }
 
 export function PlayerProvider({ children }: PlayerProviderProps) {
