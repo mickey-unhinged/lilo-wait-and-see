@@ -60,6 +60,35 @@ interface PlayerProviderProps {
   children: React.ReactNode;
 }
 
+// Helper to save to play history
+function saveToPlayHistory(track: Track) {
+  try {
+    const LOCAL_STORAGE_KEY = "lilo-play-history";
+    const MAX_HISTORY = 50;
+    
+    const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+    let entries: { track: Track; playedAt: string }[] = stored ? JSON.parse(stored) : [];
+    
+    // Remove existing entry for this track
+    entries = entries.filter(e => e.track.id !== track.id);
+    
+    // Add new entry at the beginning
+    entries.unshift({
+      track,
+      playedAt: new Date().toISOString(),
+    });
+    
+    // Limit history size
+    if (entries.length > MAX_HISTORY) {
+      entries = entries.slice(0, MAX_HISTORY);
+    }
+    
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(entries));
+  } catch (e) {
+    console.error("Failed to save play history:", e);
+  }
+}
+
 export function PlayerProvider({ children }: PlayerProviderProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [state, setState] = useState<PlayerState>({
@@ -147,6 +176,9 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     
     if (track) {
       setState(prev => ({ ...prev, currentTrack: track, isLoading: true }));
+      
+      // Save to play history
+      saveToPlayHistory(track);
       
       let audioUrl = track.audio_url;
       
