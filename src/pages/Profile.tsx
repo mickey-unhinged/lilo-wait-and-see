@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, ChevronRight, LogOut, Moon, Bell, Shield, HelpCircle, Music, User, Sun, Volume2, Info, Mail, MessageSquare, Bug, ExternalLink } from "lucide-react";
+import { Settings, ChevronRight, LogOut, Moon, Bell, Shield, HelpCircle, Music, User, Sun, Volume2, Info, Mail, MessageSquare, Bug, ExternalLink, Users, Sliders } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -10,27 +10,52 @@ import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useSettings } from "@/hooks/useSettings";
 import { Watermark } from "@/components/common/Watermark";
+import { useMusicMood } from "@/hooks/useMusicMood";
+import { useProfileStats } from "@/hooks/useProfileStats";
+import { UserSearchSheet } from "@/components/profile/UserSearchSheet";
+import { AvatarUpload } from "@/components/profile/AvatarUpload";
+import { Equalizer } from "@/components/settings/Equalizer";
 
 const Profile = () => {
   const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [activeSheet, setActiveSheet] = useState<string | null>(null);
   const [showSettingsSheet, setShowSettingsSheet] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { theme, toggleTheme } = useTheme();
   const { settings, toggleSetting } = useSettings();
+  const musicMood = useMusicMood();
+  const profileStats = useProfileStats(user?.id);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user || null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      } else {
+        setProfile(null);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const fetchProfile = async (userId: string) => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+    setProfile(data);
+  };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -38,27 +63,31 @@ const Profile = () => {
     navigate("/auth");
   };
 
-  // Mock user data for display
+  const handleAvatarUpdate = (url: string) => {
+    setProfile((prev: any) => prev ? { ...prev, avatar_url: url } : null);
+  };
+
+  // Display user data
   const displayUser = {
-    name: user?.user_metadata?.display_name || user?.email?.split("@")[0] || "Guest",
-    username: user?.email ? `@${user.email.split("@")[0]}` : "@guest",
-    avatarUrl: user?.user_metadata?.avatar_url || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop",
-    followers: 248,
-    following: 186,
-    playlists: 24,
-    isPremium: false,
+    name: profile?.display_name || user?.user_metadata?.display_name || user?.email?.split("@")[0] || "Guest",
+    username: profile?.username || (user?.email ? `@${user.email.split("@")[0]}` : "@guest"),
+    avatarUrl: profile?.avatar_url || user?.user_metadata?.avatar_url || null,
   };
 
   const menuItems = [
     { icon: Music, label: "Playback", description: "Audio quality, crossfade" },
+    { icon: Sliders, label: "Equalizer", description: "Customize your sound" },
     { icon: Bell, label: "Notifications", description: "Push, email alerts" },
     { icon: Shield, label: "Privacy", description: "Data, personalization" },
     { icon: theme === "dark" ? Moon : Sun, label: "Appearance", description: "Theme, display" },
     { icon: HelpCircle, label: "Help & Support", description: "FAQ, contact us" },
   ];
 
+  const CONTACT_EMAIL = "rookie.techlab@gmail.com";
+
   const handleContactSupport = () => {
-    toast({ title: "Support", description: "Contact support at support@lilo.app" });
+    window.location.href = `mailto:${CONTACT_EMAIL}`;
+    toast({ title: "Opening email", description: `Contact us at ${CONTACT_EMAIL}` });
   };
 
   const handleReportProblem = () => {
@@ -80,7 +109,7 @@ const Profile = () => {
           <ChevronRight className="w-5 h-5 text-muted-foreground" />
         </button>
       </SheetTrigger>
-      <SheetContent side="bottom" className="rounded-t-3xl">
+      <SheetContent side="bottom" className="rounded-t-3xl max-h-[80vh] overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <item.icon className="w-5 h-5" />
@@ -137,6 +166,9 @@ const Profile = () => {
                 <Slider defaultValue={[75]} max={100} step={1} className="mt-2" />
               </div>
             </>
+          )}
+          {item.label === "Equalizer" && (
+            <Equalizer />
           )}
           {item.label === "Notifications" && (
             <>
@@ -267,12 +299,14 @@ const Profile = () => {
               </button>
               <button 
                 onClick={handleContactSupport}
-                className="w-full p-4 rounded-xl bg-card/50 hover:bg-card text-left transition-colors flex items-center gap-3"
+                className="w-full p-4 rounded-xl bg-card/50 hover:bg-card text-left transition-colors"
               >
-                <Mail className="w-5 h-5 text-muted-foreground" />
-                <div>
-                  <p className="font-medium">Contact Support</p>
-                  <p className="text-sm text-muted-foreground">Get help from our team</p>
+                <div className="flex items-center gap-3">
+                  <Mail className="w-5 h-5 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">Contact Support</p>
+                    <p className="text-sm text-muted-foreground">{CONTACT_EMAIL}</p>
+                  </div>
                 </div>
               </button>
               <button 
@@ -367,10 +401,11 @@ const Profile = () => {
         <div className="glass rounded-3xl p-6 mb-6">
           <div className="flex items-center gap-4 mb-6">
             {user ? (
-              <img
-                src={displayUser.avatarUrl}
-                alt={displayUser.name}
-                className="w-20 h-20 rounded-full object-cover border-2 border-primary"
+              <AvatarUpload
+                userId={user.id}
+                currentAvatarUrl={displayUser.avatarUrl}
+                displayName={displayUser.name}
+                onUploadComplete={handleAvatarUpdate}
               />
             ) : (
               <div className="w-20 h-20 rounded-full bg-card flex items-center justify-center border-2 border-border">
@@ -381,11 +416,17 @@ const Profile = () => {
               <h2 className="text-xl font-bold">{displayUser.name}</h2>
               <p className="text-muted-foreground">{displayUser.username}</p>
               {user ? (
-                !displayUser.isPremium && (
-                  <button className="mt-2 px-4 py-1.5 text-xs font-semibold gradient-bg text-primary-foreground rounded-full">
-                    Upgrade to Premium
-                  </button>
-                )
+                /* Music Mood Badge */
+                <div 
+                  className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold"
+                  style={{ 
+                    backgroundColor: `${musicMood.color}20`,
+                    color: musicMood.color 
+                  }}
+                >
+                  <span>{musicMood.emoji}</span>
+                  <span>{musicMood.mood}</span>
+                </div>
               ) : (
                 <button 
                   onClick={() => navigate("/auth")}
@@ -400,19 +441,35 @@ const Profile = () => {
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4 text-center">
             <div className="p-3 rounded-2xl bg-card/50">
-              <p className="text-xl font-bold">{displayUser.playlists}</p>
+              <p className="text-xl font-bold">{profileStats.playlists}</p>
               <p className="text-xs text-muted-foreground">Playlists</p>
             </div>
             <div className="p-3 rounded-2xl bg-card/50">
-              <p className="text-xl font-bold">{displayUser.followers}</p>
+              <p className="text-xl font-bold">{profileStats.followers}</p>
               <p className="text-xs text-muted-foreground">Followers</p>
             </div>
             <div className="p-3 rounded-2xl bg-card/50">
-              <p className="text-xl font-bold">{displayUser.following}</p>
+              <p className="text-xl font-bold">{profileStats.following}</p>
               <p className="text-xs text-muted-foreground">Following</p>
             </div>
           </div>
         </div>
+
+        {/* Find Friends Button */}
+        {user && (
+          <UserSearchSheet currentUserId={user.id}>
+            <button className="w-full flex items-center gap-4 p-4 mb-4 rounded-2xl bg-primary/10 hover:bg-primary/20 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                <Users className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="font-medium">Find Friends</p>
+                <p className="text-sm text-muted-foreground">Search and follow other users</p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </button>
+          </UserSearchSheet>
+        )}
         
         {/* Menu items */}
         <div className="space-y-2">

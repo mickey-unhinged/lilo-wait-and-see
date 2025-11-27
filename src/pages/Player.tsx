@@ -229,7 +229,7 @@ const Player = () => {
 
             {/* Lyrics panel - shown inline when active */}
             {showLyrics && (
-              <div className="flex-1 h-48 md:h-64 min-w-0 bg-card/30 rounded-2xl backdrop-blur-sm border border-border/20 overflow-hidden">
+              <div className="flex-1 h-64 md:h-80 lg:h-96 min-w-0 bg-card/30 rounded-2xl backdrop-blur-sm border border-border/20 overflow-hidden">
                 <LyricsPanel title={track?.title} artist={track?.artist_name} />
               </div>
             )}
