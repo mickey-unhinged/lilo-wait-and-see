@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
-import { ChevronDown, MoreHorizontal, Heart, Share2, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, ListMusic, Volume2 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { ChevronDown, MoreHorizontal, Heart, Share2, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, ListMusic, Volume2, Music2, Video } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { demoTracks } from "@/hooks/useTracks";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LyricsPanel } from "@/components/player/LyricsPanel";
+import { VideoPreview } from "@/components/player/VideoPreview";
 
 function formatTime(seconds: number): string {
   if (!seconds || isNaN(seconds)) return "0:00";
@@ -229,7 +232,7 @@ const Player = () => {
         </div>
         
         {/* Bottom controls */}
-        <div className="flex items-center justify-between px-8 pb-8">
+        <div className="flex items-center justify-between px-8 pb-4">
           <button className="p-2 text-muted-foreground hover:text-foreground transition-colors">
             <ListMusic className="w-5 h-5" />
           </button>
@@ -245,6 +248,26 @@ const Player = () => {
             />
           </div>
         </div>
+
+        {/* Lyrics & Video Tabs */}
+        <Tabs defaultValue="lyrics" className="px-4 pb-8">
+          <TabsList className="w-full grid grid-cols-2 bg-muted/30">
+            <TabsTrigger value="lyrics" className="gap-2">
+              <Music2 className="w-4 h-4" />
+              Lyrics
+            </TabsTrigger>
+            <TabsTrigger value="video" className="gap-2">
+              <Video className="w-4 h-4" />
+              Video
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="lyrics" className="mt-4 h-64 rounded-xl bg-muted/20 border border-border/30">
+            <LyricsPanel title={track?.title} artist={track?.artist_name} />
+          </TabsContent>
+          <TabsContent value="video" className="mt-4 p-4 rounded-xl bg-muted/20 border border-border/30">
+            <VideoPreview videoId={track?.videoId} title={track?.title} />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
