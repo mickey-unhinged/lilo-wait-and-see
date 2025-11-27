@@ -122,12 +122,16 @@ export function SearchResults({ results, isLoading }: SearchResultsProps) {
               <span>{formatDuration(track.duration_ms)}</span>
             </div>
 
-            {/* Preview badge */}
-            {track.id.startsWith("itunes-") && (
+            {/* Source badge */}
+            {track.id.startsWith("ytm-") ? (
+              <span className="px-2 py-0.5 text-[10px] font-medium bg-red-500/20 text-red-400 rounded-full">
+                YT Music
+              </span>
+            ) : track.id.startsWith("itunes-") ? (
               <span className="px-2 py-0.5 text-[10px] font-medium bg-secondary/50 rounded-full">
                 Preview
               </span>
-            )}
+            ) : null}
           </button>
         );
       })}

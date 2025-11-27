@@ -1,10 +1,14 @@
-import { useState, useEffect, useCallback } from "react";
-import { Search as SearchIcon, X, Mic, TrendingUp } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Search as SearchIcon, X, Mic, TrendingUp, Music } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { SearchResults } from "@/components/search/SearchResults";
+import { useYouTubeMusicSearch } from "@/hooks/useYouTubeMusicSearch";
 import { useMusicSearch } from "@/hooks/useMusicSearch";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/useDebounce";
+import type { Track } from "@/contexts/PlayerContext";
+
+type SearchSource = "youtube" | "itunes";
 
 const genres = [
   { id: "1", name: "Pop", color: "from-pink-500 to-rose-500" },
@@ -42,17 +46,28 @@ const trendingSearches = [
 const Search = () => {
   const [query, setQuery] = useState("");
   const [isFocused, setIsFocused] = useState(false);
-  const debouncedQuery = useDebounce(query, 300);
-  const { results, isLoading, searchMusic, clearResults } = useMusicSearch();
+  const [searchSource, setSearchSource] = useState<SearchSource>("youtube");
+  const debouncedQuery = useDebounce(query, 400);
+  
+  const ytMusic = useYouTubeMusicSearch();
+  const iTunes = useMusicSearch();
+  
+  const results: Track[] = searchSource === "youtube" ? ytMusic.results : iTunes.results;
+  const isLoading = searchSource === "youtube" ? ytMusic.isLoading : iTunes.isLoading;
 
   // Search when debounced query changes
   useEffect(() => {
     if (debouncedQuery.trim()) {
-      searchMusic(debouncedQuery);
+      if (searchSource === "youtube") {
+        ytMusic.searchMusic(debouncedQuery);
+      } else {
+        iTunes.searchMusic(debouncedQuery);
+      }
     } else {
-      clearResults();
+      ytMusic.clearResults();
+      iTunes.clearResults();
     }
-  }, [debouncedQuery]);
+  }, [debouncedQuery, searchSource]);
 
   const handleGenreClick = (genreName: string) => {
     setQuery(genreName);
@@ -98,7 +113,8 @@ const Search = () => {
             <button
               onClick={() => {
                 setQuery("");
-                clearResults();
+                ytMusic.clearResults();
+                iTunes.clearResults();
               }}
               className="p-1"
             >
@@ -109,6 +125,32 @@ const Search = () => {
               <Mic className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />
             </button>
           )}
+        </div>
+
+        {/* Source Toggle */}
+        <div className="flex items-center justify-center gap-2 mt-3">
+          <button
+            onClick={() => setSearchSource("youtube")}
+            className={cn(
+              "px-4 py-1.5 rounded-full text-xs font-medium transition-all",
+              searchSource === "youtube"
+                ? "bg-primary text-primary-foreground"
+                : "bg-card text-muted-foreground hover:text-foreground"
+            )}
+          >
+            YouTube Music
+          </button>
+          <button
+            onClick={() => setSearchSource("itunes")}
+            className={cn(
+              "px-4 py-1.5 rounded-full text-xs font-medium transition-all",
+              searchSource === "itunes"
+                ? "bg-primary text-primary-foreground"
+                : "bg-card text-muted-foreground hover:text-foreground"
+            )}
+          >
+            iTunes (30s preview)
+          </button>
         </div>
 
         {/* Info badge */}
