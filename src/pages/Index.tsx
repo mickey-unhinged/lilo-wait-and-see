@@ -2,6 +2,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { HeroSection } from "@/components/home/HeroSection";
 import { QuickAccessGrid } from "@/components/home/QuickAccessGrid";
 import { RecentlyPlayedSection } from "@/components/home/RecentlyPlayedSection";
+import { ForYouSection } from "@/components/home/ForYouSection";
 import { TrendingSection } from "@/components/home/TrendingSection";
 import { TopArtistsSection } from "@/components/home/TopArtistsSection";
 import { Watermark } from "@/components/common/Watermark";
@@ -12,6 +13,7 @@ const Index = () => {
       <HeroSection />
       <QuickAccessGrid />
       <RecentlyPlayedSection />
+      <ForYouSection />
       <TrendingSection />
       <TopArtistsSection />
       
