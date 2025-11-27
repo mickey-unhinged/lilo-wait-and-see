@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Music, Mail, Lock, User, Loader2 } from "lucide-react";
 import { z } from "zod";
+import { Watermark } from "@/components/common/Watermark";
 
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
@@ -195,6 +196,11 @@ const Auth = () => {
             <span className="text-primary font-medium">{isLogin ? "Sign up" : "Sign in"}</span>
           </button>
         </div>
+      </div>
+
+      {/* Watermark */}
+      <div className="mt-8">
+        <Watermark />
       </div>
     </div>
   );

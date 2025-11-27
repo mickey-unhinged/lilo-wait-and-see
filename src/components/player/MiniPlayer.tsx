@@ -1,18 +1,30 @@
 import { Play, Pause, SkipForward, Heart } from "lucide-react";
-import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
 import { usePlayer } from "@/contexts/PlayerContext";
+import { useLikedSongs } from "@/hooks/useLikedSongs";
+import { useToast } from "@/hooks/use-toast";
 
 export function MiniPlayer() {
   const { currentTrack, isPlaying, progress, duration, toggle, next, isLoading } = usePlayer();
-  const [isLiked, setIsLiked] = useState(false);
+  const { isLiked, toggleLike } = useLikedSongs();
+  const { toast } = useToast();
   
   // Don't render if no track
   if (!currentTrack) return null;
   
   const progressPercent = duration > 0 ? (progress / duration) * 100 : 0;
   const coverUrl = currentTrack.cover_url || currentTrack.album_cover || "https://images.unsplash.com/photo-1614149162883-504ce4d13909?w=100&h=100&fit=crop";
+  const trackIsLiked = isLiked(currentTrack.id);
+
+  const handleLikeToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newState = await toggleLike(currentTrack);
+    toast({
+      title: newState ? "Added to Liked Songs" : "Removed from Liked Songs",
+      description: currentTrack.title,
+    });
+  };
   
   return (
     <Link 
@@ -52,18 +64,15 @@ export function MiniPlayer() {
         {/* Controls */}
         <div className="flex items-center gap-1" onClick={(e) => e.preventDefault()}>
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsLiked(!isLiked);
-            }}
+            onClick={handleLikeToggle}
             className={cn(
               "p-2 rounded-full transition-all duration-300",
-              isLiked ? "text-accent" : "text-muted-foreground hover:text-foreground"
+              trackIsLiked ? "text-accent" : "text-muted-foreground hover:text-foreground"
             )}
           >
             <Heart 
               className="w-5 h-5" 
-              fill={isLiked ? "currentColor" : "none"}
+              fill={trackIsLiked ? "currentColor" : "none"}
             />
           </button>
           

@@ -1,13 +1,17 @@
 import { useState, useEffect } from "react";
-import { ChevronDown, MoreHorizontal, Heart, Share2, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, ListMusic, Volume2, Music2, Video } from "lucide-react";
+import { ChevronDown, MoreHorizontal, Heart, Share2, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, ListMusic, Volume2, Music2, Video, PlusCircle, Radio, User, Flag, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { demoTracks } from "@/hooks/useTracks";
+import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LyricsPanel } from "@/components/player/LyricsPanel";
 import { VideoPreview } from "@/components/player/VideoPreview";
+import { useToast } from "@/hooks/use-toast";
+import { Watermark } from "@/components/common/Watermark";
 
 function formatTime(seconds: number): string {
   if (!seconds || isNaN(seconds)) return "0:00";
@@ -18,6 +22,7 @@ function formatTime(seconds: number): string {
 
 const Player = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const {
     currentTrack,
     isPlaying,
@@ -27,6 +32,7 @@ const Player = () => {
     isShuffle,
     repeatMode,
     isLoading,
+    queue,
     toggle,
     next,
     previous,
@@ -38,8 +44,9 @@ const Player = () => {
     setQueue,
   } = usePlayer();
   
-  const [isLiked, setIsLiked] = useState(false);
+  const { isLiked, toggleLike } = useLikedSongs();
   const [bars, setBars] = useState<number[]>(Array(40).fill(0.5));
+  const [showQueue, setShowQueue] = useState(false);
   
   // Auto-play first demo track if no track is loaded
   useEffect(() => {
@@ -66,6 +73,52 @@ const Player = () => {
   const dominantColor = "280 100% 65%";
   
   const progressPercent = duration > 0 ? (progress / duration) * 100 : 0;
+  const trackIsLiked = track ? isLiked(track.id) : false;
+
+  const handleLikeToggle = async () => {
+    if (track) {
+      const newState = await toggleLike(track);
+      toast({
+        title: newState ? "Added to Liked Songs" : "Removed from Liked Songs",
+        description: track.title,
+      });
+    }
+  };
+
+  const handleShare = async () => {
+    if (track) {
+      try {
+        if (navigator.share) {
+          await navigator.share({
+            title: track.title,
+            text: `Check out "${track.title}" by ${track.artist_name} on Lilo!`,
+            url: window.location.href,
+          });
+        } else {
+          await navigator.clipboard.writeText(`Check out "${track.title}" by ${track.artist_name} on Lilo! ${window.location.href}`);
+          toast({ title: "Link copied!", description: "Share link copied to clipboard" });
+        }
+      } catch (err) {
+        console.error("Share failed:", err);
+      }
+    }
+  };
+
+  const handleAddToPlaylist = () => {
+    toast({ title: "Coming soon", description: "Add to playlist feature is coming soon!" });
+  };
+
+  const handleGoToArtist = () => {
+    toast({ title: "Coming soon", description: "Artist page is coming soon!" });
+  };
+
+  const handleStartRadio = () => {
+    toast({ title: "Starting Radio", description: `Creating a radio station based on ${track?.title}` });
+  };
+
+  const handleReportIssue = () => {
+    toast({ title: "Reported", description: "Thank you for your feedback" });
+  };
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
@@ -90,9 +143,41 @@ const Player = () => {
             <p className="text-xs text-muted-foreground uppercase tracking-wider">Playing from</p>
             <p className="text-sm font-medium">{track?.album_title || "Your Library"}</p>
           </div>
-          <button className="p-2 -m-2">
-            <MoreHorizontal className="w-6 h-6" />
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="p-2 -m-2">
+                <MoreHorizontal className="w-6 h-6" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={handleLikeToggle}>
+                <Heart className="w-4 h-4 mr-2" fill={trackIsLiked ? "currentColor" : "none"} />
+                {trackIsLiked ? "Remove from Liked" : "Add to Liked Songs"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleAddToPlaylist}>
+                <PlusCircle className="w-4 h-4 mr-2" />
+                Add to Playlist
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleGoToArtist}>
+                <User className="w-4 h-4 mr-2" />
+                Go to Artist
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleStartRadio}>
+                <Radio className="w-4 h-4 mr-2" />
+                Start Radio
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleShare}>
+                <Share2 className="w-4 h-4 mr-2" />
+                Share
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleReportIssue}>
+                <Flag className="w-4 h-4 mr-2" />
+                Report Issue
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </header>
         
         {/* Album art with visualizer */}
@@ -143,13 +228,13 @@ const Player = () => {
             </div>
             <div className="flex items-center gap-1 ml-4">
               <button
-                onClick={() => setIsLiked(!isLiked)}
+                onClick={handleLikeToggle}
                 className={cn(
                   "p-2 rounded-full transition-all duration-300",
-                  isLiked ? "text-accent" : "text-muted-foreground hover:text-foreground"
+                  trackIsLiked ? "text-accent" : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <Heart className="w-6 h-6" fill={isLiked ? "currentColor" : "none"} />
+                <Heart className="w-6 h-6" fill={trackIsLiked ? "currentColor" : "none"} />
               </button>
             </div>
           </div>
@@ -192,7 +277,10 @@ const Player = () => {
               </Sheet>
             )}
             
-            <button className="p-2 rounded-full text-muted-foreground hover:text-foreground transition-colors ml-auto">
+            <button 
+              onClick={handleShare}
+              className="p-2 rounded-full text-muted-foreground hover:text-foreground transition-colors ml-auto"
+            >
               <Share2 className="w-5 h-5" />
             </button>
           </div>
@@ -272,10 +360,56 @@ const Player = () => {
         </div>
         
         {/* Bottom controls */}
-        <div className="flex items-center justify-between px-8 pb-8">
-          <button className="p-2 text-muted-foreground hover:text-foreground transition-colors">
-            <ListMusic className="w-5 h-5" />
-          </button>
+        <div className="flex items-center justify-between px-8 pb-4">
+          <Sheet open={showQueue} onOpenChange={setShowQueue}>
+            <SheetTrigger asChild>
+              <button className="p-2 text-muted-foreground hover:text-foreground transition-colors">
+                <ListMusic className="w-5 h-5" />
+              </button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="h-[70vh] rounded-t-3xl">
+              <SheetHeader className="pb-4">
+                <SheetTitle className="text-center">Queue ({queue.length} tracks)</SheetTitle>
+              </SheetHeader>
+              <div className="h-[calc(100%-4rem)] overflow-y-auto space-y-2 px-2">
+                {queue.map((qTrack, index) => (
+                  <button
+                    key={`${qTrack.id}-${index}`}
+                    onClick={() => {
+                      playTrack(qTrack, queue);
+                      setShowQueue(false);
+                    }}
+                    className={cn(
+                      "w-full flex items-center gap-3 p-3 rounded-xl hover:bg-card/50 transition-colors",
+                      currentTrack?.id === qTrack.id && "bg-card/50"
+                    )}
+                  >
+                    <span className="w-6 text-sm text-muted-foreground">{index + 1}</span>
+                    <img 
+                      src={qTrack.cover_url || qTrack.album_cover || "https://images.unsplash.com/photo-1614149162883-504ce4d13909?w=100&h=100&fit=crop"}
+                      alt={qTrack.title}
+                      className="w-10 h-10 rounded-lg object-cover"
+                    />
+                    <div className="flex-1 min-w-0 text-left">
+                      <p className={cn(
+                        "font-medium truncate text-sm",
+                        currentTrack?.id === qTrack.id && "text-primary"
+                      )}>
+                        {qTrack.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">{qTrack.artist_name}</p>
+                    </div>
+                  </button>
+                ))}
+                {queue.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>Queue is empty</p>
+                    <p className="text-sm">Add songs to start playing</p>
+                  </div>
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
           
           <div className="flex items-center gap-2 w-32">
             <Volume2 className="w-4 h-4 text-muted-foreground" />
@@ -287,6 +421,11 @@ const Player = () => {
               className="flex-1"
             />
           </div>
+        </div>
+
+        {/* Watermark */}
+        <div className="text-center pb-4">
+          <Watermark variant="subtle" />
         </div>
       </div>
     </div>

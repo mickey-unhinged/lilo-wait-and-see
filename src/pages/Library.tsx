@@ -3,6 +3,7 @@ import { Plus, Grid3X3, List, ChevronDown, Music, Mic2, Heart } from "lucide-rea
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { cn } from "@/lib/utils";
+import { Watermark } from "@/components/common/Watermark";
 
 type ViewMode = "grid" | "list";
 type FilterType = "all" | "playlists" | "albums" | "artists" | "podcasts";
@@ -20,10 +21,11 @@ const libraryItems = [
     id: "liked",
     type: "playlist" as const,
     title: "Liked Songs",
-    subtitle: "324 songs",
+    subtitle: "Your favorites",
     imageUrl: null,
     icon: Heart,
     isPinned: true,
+    route: "/liked-songs",
   },
   {
     id: "2",
@@ -31,6 +33,7 @@ const libraryItems = [
     title: "Chill Vibes",
     subtitle: "By You • 48 songs",
     imageUrl: "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=200&h=200&fit=crop",
+    route: "/playlist/2",
   },
   {
     id: "album-1",
@@ -52,6 +55,7 @@ const libraryItems = [
     title: "Night Drive",
     subtitle: "By You • 62 songs",
     imageUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=200&h=200&fit=crop",
+    route: "/playlist/3",
   },
   {
     id: "album-2",
@@ -83,7 +87,9 @@ const Library = () => {
   });
 
   const handleItemClick = (item: typeof libraryItems[0]) => {
-    if (item.type === "playlist") {
+    if (item.route) {
+      navigate(item.route);
+    } else if (item.type === "playlist") {
       navigate(`/playlist/${item.id}`);
     }
     // Albums and artists can be handled later
@@ -202,6 +208,11 @@ const Library = () => {
             </div>
           </button>
         ))}
+      </div>
+
+      {/* Watermark */}
+      <div className="px-4 pb-8 text-center">
+        <Watermark variant="subtle" />
       </div>
     </AppLayout>
   );

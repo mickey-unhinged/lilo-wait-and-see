@@ -6,6 +6,7 @@ import { useYouTubeMusicSearch } from "@/hooks/useYouTubeMusicSearch";
 import { useMusicSearch } from "@/hooks/useMusicSearch";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/useDebounce";
+import { Watermark } from "@/components/common/Watermark";
 import type { Track } from "@/contexts/PlayerContext";
 
 type SearchSource = "youtube" | "itunes";
@@ -233,6 +234,11 @@ const Search = () => {
               ))}
             </div>
           </section>
+
+          {/* Watermark */}
+          <div className="px-4 pb-8 text-center">
+            <Watermark variant="subtle" />
+          </div>
         </>
       )}
     </AppLayout>
