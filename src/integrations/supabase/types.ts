@@ -14,16 +14,488 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      albums: {
+        Row: {
+          artist_id: string
+          cover_url: string | null
+          created_at: string | null
+          duration_ms: number | null
+          id: string
+          release_date: string | null
+          title: string
+          total_tracks: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          artist_id: string
+          cover_url?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          id?: string
+          release_date?: string | null
+          title: string
+          total_tracks?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          artist_id?: string
+          cover_url?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          id?: string
+          release_date?: string | null
+          title?: string
+          total_tracks?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "albums_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      artists: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          cover_url: string | null
+          created_at: string | null
+          id: string
+          monthly_listeners: number | null
+          name: string
+          updated_at: string | null
+          user_id: string | null
+          verified: boolean | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          id?: string
+          monthly_listeners?: number | null
+          name: string
+          updated_at?: string | null
+          user_id?: string | null
+          verified?: boolean | null
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          id?: string
+          monthly_listeners?: number | null
+          name?: string
+          updated_at?: string | null
+          user_id?: string | null
+          verified?: boolean | null
+        }
+        Relationships: []
+      }
+      followed_artists: {
+        Row: {
+          artist_id: string
+          followed_at: string | null
+          user_id: string
+        }
+        Insert: {
+          artist_id: string
+          followed_at?: string | null
+          user_id: string
+        }
+        Update: {
+          artist_id?: string
+          followed_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "followed_artists_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      genres: {
+        Row: {
+          color: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          color?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      liked_albums: {
+        Row: {
+          album_id: string
+          liked_at: string | null
+          user_id: string
+        }
+        Insert: {
+          album_id: string
+          liked_at?: string | null
+          user_id: string
+        }
+        Update: {
+          album_id?: string
+          liked_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "liked_albums_album_id_fkey"
+            columns: ["album_id"]
+            isOneToOne: false
+            referencedRelation: "albums"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      liked_tracks: {
+        Row: {
+          liked_at: string | null
+          track_id: string
+          user_id: string
+        }
+        Insert: {
+          liked_at?: string | null
+          track_id: string
+          user_id: string
+        }
+        Update: {
+          liked_at?: string | null
+          track_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "liked_tracks_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      play_history: {
+        Row: {
+          completed: boolean | null
+          duration_played_ms: number | null
+          id: string
+          played_at: string | null
+          track_id: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean | null
+          duration_played_ms?: number | null
+          id?: string
+          played_at?: string | null
+          track_id: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean | null
+          duration_played_ms?: number | null
+          id?: string
+          played_at?: string | null
+          track_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "play_history_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playlist_tracks: {
+        Row: {
+          added_at: string | null
+          added_by: string | null
+          id: string
+          playlist_id: string
+          position: number
+          track_id: string
+        }
+        Insert: {
+          added_at?: string | null
+          added_by?: string | null
+          id?: string
+          playlist_id: string
+          position: number
+          track_id: string
+        }
+        Update: {
+          added_at?: string | null
+          added_by?: string | null
+          id?: string
+          playlist_id?: string
+          position?: number
+          track_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_tracks_playlist_id_fkey"
+            columns: ["playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playlist_tracks_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playlists: {
+        Row: {
+          cover_url: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_collaborative: boolean | null
+          is_public: boolean | null
+          owner_id: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          cover_url?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_collaborative?: boolean | null
+          is_public?: boolean | null
+          owner_id: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          cover_url?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_collaborative?: boolean | null
+          is_public?: boolean | null
+          owner_id?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string | null
+          display_name: string | null
+          id: string
+          is_premium: boolean | null
+          preferred_quality: Database["public"]["Enums"]["audio_quality"] | null
+          updated_at: string | null
+          user_type: Database["public"]["Enums"]["user_type"] | null
+          username: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          id: string
+          is_premium?: boolean | null
+          preferred_quality?:
+            | Database["public"]["Enums"]["audio_quality"]
+            | null
+          updated_at?: string | null
+          user_type?: Database["public"]["Enums"]["user_type"] | null
+          username?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          id?: string
+          is_premium?: boolean | null
+          preferred_quality?:
+            | Database["public"]["Enums"]["audio_quality"]
+            | null
+          updated_at?: string | null
+          user_type?: Database["public"]["Enums"]["user_type"] | null
+          username?: string | null
+        }
+        Relationships: []
+      }
+      track_genres: {
+        Row: {
+          genre_id: string
+          track_id: string
+        }
+        Insert: {
+          genre_id: string
+          track_id: string
+        }
+        Update: {
+          genre_id?: string
+          track_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "track_genres_genre_id_fkey"
+            columns: ["genre_id"]
+            isOneToOne: false
+            referencedRelation: "genres"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "track_genres_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tracks: {
+        Row: {
+          album_id: string | null
+          artist_id: string
+          audio_url: string | null
+          cover_url: string | null
+          created_at: string | null
+          duration_ms: number
+          id: string
+          is_explicit: boolean | null
+          lyrics: string | null
+          plays: number | null
+          title: string
+          track_number: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          album_id?: string | null
+          artist_id: string
+          audio_url?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          duration_ms?: number
+          id?: string
+          is_explicit?: boolean | null
+          lyrics?: string | null
+          plays?: number | null
+          title: string
+          track_number?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          album_id?: string | null
+          artist_id?: string
+          audio_url?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          duration_ms?: number
+          id?: string
+          is_explicit?: boolean | null
+          lyrics?: string | null
+          plays?: number | null
+          title?: string
+          track_number?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracks_album_id_fkey"
+            columns: ["album_id"]
+            isOneToOne: false
+            referencedRelation: "albums"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tracks_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_follows: {
+        Row: {
+          followed_at: string | null
+          follower_id: string
+          following_id: string
+        }
+        Insert: {
+          followed_at?: string | null
+          follower_id: string
+          following_id: string
+        }
+        Update: {
+          followed_at?: string | null
+          follower_id?: string
+          following_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator" | "user"
+      audio_quality: "low" | "standard" | "high" | "lossless"
+      content_type: "track" | "album" | "podcast" | "episode"
+      user_type: "listener" | "artist"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +622,11 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator", "user"],
+      audio_quality: ["low", "standard", "high", "lossless"],
+      content_type: ["track", "album", "podcast", "episode"],
+      user_type: ["listener", "artist"],
+    },
   },
 } as const
