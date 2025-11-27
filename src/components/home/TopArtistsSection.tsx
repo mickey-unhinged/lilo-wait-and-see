@@ -1,41 +1,50 @@
+import { useQuery } from "@tanstack/react-query";
 import { SectionHeader } from "./SectionHeader";
 import { HorizontalScroll } from "./HorizontalScroll";
 import { ArtistCard } from "./ArtistCard";
-
-const topArtists = [
-  {
-    id: "1",
-    name: "Luna Echo",
-    imageUrl: "https://images.unsplash.com/photo-1614149162883-504ce4d13909?w=200&h=200&fit=crop",
-    followers: "2.4M",
-  },
-  {
-    id: "2",
-    name: "The Midnight",
-    imageUrl: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=200&h=200&fit=crop",
-    followers: "1.8M",
-  },
-  {
-    id: "3",
-    name: "Neon Dreams",
-    imageUrl: "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=200&h=200&fit=crop",
-    followers: "3.1M",
-  },
-  {
-    id: "4",
-    name: "Aurora",
-    imageUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=200&h=200&fit=crop",
-    followers: "5.2M",
-  },
-  {
-    id: "5",
-    name: "Coastal",
-    imageUrl: "https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=200&h=200&fit=crop",
-    followers: "890K",
-  },
-];
+import { supabase } from "@/integrations/supabase/client";
+import { Users } from "lucide-react";
 
 export function TopArtistsSection() {
+  const { data: artists, isLoading } = useQuery({
+    queryKey: ["top-artists"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("artists")
+        .select("*")
+        .order("monthly_listeners", { ascending: false })
+        .limit(5);
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const formatFollowers = (count: number | null) => {
+    if (!count) return "0";
+    if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
+    if (count >= 1000) return `${(count / 1000).toFixed(0)}K`;
+    return count.toString();
+  };
+
+  if (!isLoading && (!artists || artists.length === 0)) {
+    return (
+      <section className="px-4 py-4">
+        <SectionHeader 
+          title="Your Top Artists" 
+          subtitle="Based on your listening"
+        />
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="w-16 h-16 rounded-full bg-card/50 flex items-center justify-center mb-4">
+            <Users className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <p className="text-muted-foreground">No artists yet</p>
+          <p className="text-sm text-muted-foreground/70">Discover new music to find your favorites</p>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="px-4 py-4">
       <SectionHeader 
@@ -43,12 +52,12 @@ export function TopArtistsSection() {
         subtitle="Based on your listening"
       />
       <HorizontalScroll>
-        {topArtists.map((artist) => (
+        {artists?.map((artist) => (
           <ArtistCard
             key={artist.id}
             name={artist.name}
-            imageUrl={artist.imageUrl}
-            followers={artist.followers}
+            imageUrl={artist.avatar_url || "https://images.unsplash.com/photo-1614149162883-504ce4d13909?w=200&h=200&fit=crop"}
+            followers={formatFollowers(artist.monthly_listeners)}
           />
         ))}
       </HorizontalScroll>

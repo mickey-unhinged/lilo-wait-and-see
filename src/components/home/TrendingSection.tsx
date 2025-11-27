@@ -2,19 +2,35 @@ import { SectionHeader } from "./SectionHeader";
 import { HorizontalScroll } from "./HorizontalScroll";
 import { TrackCard } from "./TrackCard";
 import { usePlayer } from "@/contexts/PlayerContext";
-import { useTrendingTracks, demoTracks } from "@/hooks/useTracks";
+import { useTrendingTracks } from "@/hooks/useTracks";
+import { Music } from "lucide-react";
 
 export function TrendingSection() {
-  const { data: tracks } = useTrendingTracks(5);
+  const { data: tracks, isLoading } = useTrendingTracks(5);
   const { currentTrack, isPlaying, playTrack, setQueue } = usePlayer();
   
-  // Use demo tracks if database is empty (different slice for variety)
-  const displayTracks = tracks && tracks.length > 0 ? tracks : demoTracks.slice(3, 8);
-  
-  const handleTrackClick = (track: typeof displayTracks[0]) => {
-    setQueue(displayTracks);
-    playTrack(track, displayTracks);
+  const handleTrackClick = (track: typeof tracks[0]) => {
+    setQueue(tracks || []);
+    playTrack(track, tracks || []);
   };
+
+  if (!isLoading && (!tracks || tracks.length === 0)) {
+    return (
+      <section className="px-4 py-4">
+        <SectionHeader 
+          title="Trending Now" 
+          subtitle="What everyone's listening to"
+        />
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="w-16 h-16 rounded-full bg-card/50 flex items-center justify-center mb-4">
+            <Music className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <p className="text-muted-foreground">No trending tracks yet</p>
+          <p className="text-sm text-muted-foreground/70">Search for music to get started</p>
+        </div>
+      </section>
+    );
+  }
   
   return (
     <section className="px-4 py-4">
@@ -23,7 +39,7 @@ export function TrendingSection() {
         subtitle="What everyone's listening to"
       />
       <HorizontalScroll>
-        {displayTracks.map((track) => (
+        {tracks?.map((track) => (
           <TrackCard
             key={track.id}
             title={track.title}
