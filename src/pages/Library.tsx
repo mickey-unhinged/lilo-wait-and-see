@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Plus, Grid3X3, List, ChevronDown, Music, Mic2, Heart, Clock, Download } from "lucide-react";
+import { Plus, Grid3X3, List, ChevronDown, Music, Mic2, Heart } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { cn } from "@/lib/utils";
 
@@ -25,42 +26,42 @@ const libraryItems = [
     isPinned: true,
   },
   {
-    id: "1",
+    id: "2",
     type: "playlist" as const,
     title: "Chill Vibes",
     subtitle: "By You • 48 songs",
     imageUrl: "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=200&h=200&fit=crop",
   },
   {
-    id: "2",
+    id: "album-1",
     type: "album" as const,
     title: "After Hours",
     subtitle: "The Weeknd",
     imageUrl: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=200&h=200&fit=crop",
   },
   {
-    id: "3",
+    id: "artist-1",
     type: "artist" as const,
     title: "Luna Echo",
     subtitle: "Artist",
     imageUrl: "https://images.unsplash.com/photo-1614149162883-504ce4d13909?w=200&h=200&fit=crop",
   },
   {
-    id: "4",
+    id: "3",
     type: "playlist" as const,
     title: "Night Drive",
     subtitle: "By You • 62 songs",
     imageUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=200&h=200&fit=crop",
   },
   {
-    id: "5",
+    id: "album-2",
     type: "album" as const,
     title: "Starboy",
     subtitle: "The Weeknd",
     imageUrl: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=200&h=200&fit=crop",
   },
   {
-    id: "6",
+    id: "artist-2",
     type: "artist" as const,
     title: "Neon Dreams",
     subtitle: "Artist",
@@ -71,6 +72,7 @@ const libraryItems = [
 const Library = () => {
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const navigate = useNavigate();
 
   const filteredItems = libraryItems.filter((item) => {
     if (activeFilter === "all") return true;
@@ -79,6 +81,13 @@ const Library = () => {
     if (activeFilter === "artists") return item.type === "artist";
     return true;
   });
+
+  const handleItemClick = (item: typeof libraryItems[0]) => {
+    if (item.type === "playlist") {
+      navigate(`/playlist/${item.id}`);
+    }
+    // Albums and artists can be handled later
+  };
 
   return (
     <AppLayout>
@@ -146,6 +155,7 @@ const Library = () => {
         {filteredItems.map((item) => (
           <button
             key={item.id}
+            onClick={() => handleItemClick(item)}
             className={cn(
               "group transition-all duration-300",
               viewMode === "grid"

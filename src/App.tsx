@@ -9,6 +9,8 @@ import Search from "./pages/Search";
 import Library from "./pages/Library";
 import Player from "./pages/Player";
 import Profile from "./pages/Profile";
+import Auth from "./pages/Auth";
+import Playlist from "./pages/Playlist";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +28,8 @@ const App = () => (
             <Route path="/library" element={<Library />} />
             <Route path="/player" element={<Player />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/playlist/:id" element={<Playlist />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
