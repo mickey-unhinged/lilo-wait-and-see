@@ -1,41 +1,21 @@
 import { SectionHeader } from "./SectionHeader";
 import { HorizontalScroll } from "./HorizontalScroll";
 import { TrackCard } from "./TrackCard";
-
-const trendingTracks = [
-  {
-    id: "1",
-    title: "Blinding Lights",
-    artist: "The Weeknd",
-    imageUrl: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=200&h=200&fit=crop",
-  },
-  {
-    id: "2",
-    title: "Heat Waves",
-    artist: "Glass Animals",
-    imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop",
-  },
-  {
-    id: "3",
-    title: "As It Was",
-    artist: "Harry Styles",
-    imageUrl: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=200&h=200&fit=crop",
-  },
-  {
-    id: "4",
-    title: "Bad Habit",
-    artist: "Steve Lacy",
-    imageUrl: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=200&h=200&fit=crop",
-  },
-  {
-    id: "5",
-    title: "Anti-Hero",
-    artist: "Taylor Swift",
-    imageUrl: "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=200&h=200&fit=crop",
-  },
-];
+import { usePlayer } from "@/contexts/PlayerContext";
+import { useTrendingTracks, demoTracks } from "@/hooks/useTracks";
 
 export function TrendingSection() {
+  const { data: tracks } = useTrendingTracks(5);
+  const { currentTrack, isPlaying, playTrack, setQueue } = usePlayer();
+  
+  // Use demo tracks if database is empty (different slice for variety)
+  const displayTracks = tracks && tracks.length > 0 ? tracks : demoTracks.slice(3, 8);
+  
+  const handleTrackClick = (track: typeof displayTracks[0]) => {
+    setQueue(displayTracks);
+    playTrack(track, displayTracks);
+  };
+  
   return (
     <section className="px-4 py-4">
       <SectionHeader 
@@ -43,13 +23,15 @@ export function TrendingSection() {
         subtitle="What everyone's listening to"
       />
       <HorizontalScroll>
-        {trendingTracks.map((track) => (
+        {displayTracks.map((track) => (
           <TrackCard
             key={track.id}
             title={track.title}
-            artist={track.artist}
-            imageUrl={track.imageUrl}
+            artist={track.artist_name}
+            imageUrl={track.cover_url || track.album_cover || "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=200&h=200&fit=crop"}
+            isPlaying={currentTrack?.id === track.id && isPlaying}
             variant="large"
+            onClick={() => handleTrackClick(track)}
           />
         ))}
       </HorizontalScroll>

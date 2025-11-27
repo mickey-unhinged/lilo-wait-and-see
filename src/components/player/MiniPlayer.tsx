@@ -2,18 +2,17 @@ import { Play, Pause, SkipForward, Heart } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
+import { usePlayer } from "@/contexts/PlayerContext";
 
 export function MiniPlayer() {
-  const [isPlaying, setIsPlaying] = useState(false);
+  const { currentTrack, isPlaying, progress, duration, toggle, next, isLoading } = usePlayer();
   const [isLiked, setIsLiked] = useState(false);
   
-  // Mock data - will be replaced with real state management
-  const currentTrack = {
-    title: "Midnight Dreams",
-    artist: "Luna Echo",
-    coverUrl: "https://images.unsplash.com/photo-1614149162883-504ce4d13909?w=100&h=100&fit=crop",
-    progress: 35,
-  };
+  // Don't render if no track
+  if (!currentTrack) return null;
+  
+  const progressPercent = duration > 0 ? (progress / duration) * 100 : 0;
+  const coverUrl = currentTrack.cover_url || currentTrack.album_cover || "https://images.unsplash.com/photo-1614149162883-504ce4d13909?w=100&h=100&fit=crop";
   
   return (
     <Link 
@@ -24,7 +23,7 @@ export function MiniPlayer() {
       <div className="h-0.5 bg-muted/50">
         <div 
           className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-300"
-          style={{ width: `${currentTrack.progress}%` }}
+          style={{ width: `${progressPercent}%` }}
         />
       </div>
       
@@ -32,7 +31,7 @@ export function MiniPlayer() {
         {/* Album art */}
         <div className="relative">
           <img
-            src={currentTrack.coverUrl}
+            src={coverUrl}
             alt={currentTrack.title}
             className="w-12 h-12 rounded-xl object-cover"
           />
@@ -47,7 +46,7 @@ export function MiniPlayer() {
         {/* Track info */}
         <div className="flex-1 min-w-0">
           <h4 className="font-medium text-sm truncate">{currentTrack.title}</h4>
-          <p className="text-xs text-muted-foreground truncate">{currentTrack.artist}</p>
+          <p className="text-xs text-muted-foreground truncate">{currentTrack.artist_name}</p>
         </div>
         
         {/* Controls */}
@@ -71,9 +70,13 @@ export function MiniPlayer() {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setIsPlaying(!isPlaying);
+              toggle();
             }}
-            className="p-2 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-300 glow-primary"
+            disabled={isLoading}
+            className={cn(
+              "p-2 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-300 glow-primary",
+              isLoading && "opacity-70"
+            )}
           >
             {isPlaying ? (
               <Pause className="w-5 h-5" fill="currentColor" />
@@ -83,7 +86,10 @@ export function MiniPlayer() {
           </button>
           
           <button
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              next();
+            }}
             className="p-2 rounded-full text-muted-foreground hover:text-foreground transition-colors"
           >
             <SkipForward className="w-5 h-5" />
