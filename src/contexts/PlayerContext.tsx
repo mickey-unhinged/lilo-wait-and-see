@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useRef, useEffect, ReactNode, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface Track {
   id: string;
@@ -14,6 +15,7 @@ export interface Track {
   duration_ms: number;
   plays?: number;
   is_explicit?: boolean;
+  videoId?: string; // For YouTube Music tracks
 }
 
 interface PlayerState {
@@ -138,15 +140,36 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     }
   }, [state.volume]);
 
-  const play = useCallback((track?: Track) => {
+  const play = useCallback(async (track?: Track) => {
     const audio = audioRef.current;
     if (!audio) return;
     
     if (track) {
       setState(prev => ({ ...prev, currentTrack: track, isLoading: true }));
       
-      // Use audio_url if available, otherwise use a demo audio
-      const audioUrl = track.audio_url || "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
+      let audioUrl = track.audio_url;
+      
+      // If it's a YouTube Music track, fetch the audio URL
+      if (track.videoId && !audioUrl) {
+        try {
+          const { data, error } = await supabase.functions.invoke("youtube-audio-stream", {
+            body: { videoId: track.videoId },
+          });
+          
+          if (error) throw error;
+          audioUrl = data?.audioUrl;
+        } catch (err) {
+          console.error("Failed to get YouTube audio URL:", err);
+          setState(prev => ({ ...prev, isLoading: false, isPlaying: false }));
+          return;
+        }
+      }
+      
+      // Use demo audio as fallback
+      if (!audioUrl) {
+        audioUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
+      }
+      
       audio.src = audioUrl;
       audio.load();
     }
