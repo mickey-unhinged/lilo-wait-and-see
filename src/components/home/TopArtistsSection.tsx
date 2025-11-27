@@ -1,37 +1,91 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { SectionHeader } from "./SectionHeader";
 import { HorizontalScroll } from "./HorizontalScroll";
 import { ArtistCard } from "./ArtistCard";
-import { supabase } from "@/integrations/supabase/client";
 import { Users } from "lucide-react";
+import { Track } from "@/contexts/PlayerContext";
+
+const LOCAL_STORAGE_KEY = "lilo-play-history";
+
+interface PlayHistoryEntry {
+  track: Track;
+  playedAt: string;
+}
+
+interface ArtistStats {
+  name: string;
+  imageUrl: string;
+  playCount: number;
+}
+
+function getTopArtistsFromHistory(entries: PlayHistoryEntry[]): ArtistStats[] {
+  const artistCounts = new Map<string, ArtistStats>();
+
+  for (const entry of entries) {
+    const artistName = entry.track.artist_name;
+    const existing = artistCounts.get(artistName);
+
+    if (existing) {
+      existing.playCount++;
+    } else {
+      artistCounts.set(artistName, {
+        name: artistName,
+        imageUrl:
+          entry.track.artist_avatar ||
+          entry.track.cover_url ||
+          entry.track.album_cover ||
+          "https://images.unsplash.com/photo-1614149162883-504ce4d13909?w=200&h=200&fit=crop",
+        playCount: 1,
+      });
+    }
+  }
+
+  // Sort by play count and return top 10
+  return Array.from(artistCounts.values())
+    .sort((a, b) => b.playCount - a.playCount)
+    .slice(0, 10);
+}
+
+function formatPlayCount(count: number): string {
+  if (count === 1) return "1 play";
+  return `${count} plays`;
+}
 
 export function TopArtistsSection() {
-  const { data: artists, isLoading } = useQuery({
-    queryKey: ["top-artists"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("artists")
-        .select("*")
-        .order("monthly_listeners", { ascending: false })
-        .limit(5);
-      
-      if (error) throw error;
-      return data;
-    },
-  });
+  const [topArtists, setTopArtists] = useState<ArtistStats[]>([]);
 
-  const formatFollowers = (count: number | null) => {
-    if (!count) return "0";
-    if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
-    if (count >= 1000) return `${(count / 1000).toFixed(0)}K`;
-    return count.toString();
-  };
+  useEffect(() => {
+    const loadTopArtists = () => {
+      try {
+        const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (stored) {
+          const entries: PlayHistoryEntry[] = JSON.parse(stored);
+          const artists = getTopArtistsFromHistory(entries);
+          setTopArtists(artists);
+        }
+      } catch (e) {
+        console.error("Failed to load top artists:", e);
+      }
+    };
 
-  if (!isLoading && (!artists || artists.length === 0)) {
+    loadTopArtists();
+
+    // Listen for storage changes and poll
+    const handleStorage = () => loadTopArtists();
+    window.addEventListener("storage", handleStorage);
+    const interval = setInterval(loadTopArtists, 5000);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      clearInterval(interval);
+    };
+  }, []);
+
+  if (topArtists.length === 0) {
     return (
       <section className="px-4 py-4">
-        <SectionHeader 
-          title="Your Top Artists" 
+        <SectionHeader
+          title="Your Top Artists"
           subtitle="Based on your listening"
         />
         <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -39,7 +93,9 @@ export function TopArtistsSection() {
             <Users className="w-8 h-8 text-muted-foreground" />
           </div>
           <p className="text-muted-foreground">No artists yet</p>
-          <p className="text-sm text-muted-foreground/70">Discover new music to find your favorites</p>
+          <p className="text-sm text-muted-foreground/70">
+            Play some music to discover your favorites
+          </p>
         </div>
       </section>
     );
@@ -47,17 +103,17 @@ export function TopArtistsSection() {
 
   return (
     <section className="px-4 py-4">
-      <SectionHeader 
-        title="Your Top Artists" 
+      <SectionHeader
+        title="Your Top Artists"
         subtitle="Based on your listening"
       />
       <HorizontalScroll>
-        {artists?.map((artist) => (
+        {topArtists.map((artist, index) => (
           <ArtistCard
-            key={artist.id}
+            key={`${artist.name}-${index}`}
             name={artist.name}
-            imageUrl={artist.avatar_url || "https://images.unsplash.com/photo-1614149162883-504ce4d13909?w=200&h=200&fit=crop"}
-            followers={formatFollowers(artist.monthly_listeners)}
+            imageUrl={artist.imageUrl}
+            followers={formatPlayCount(artist.playCount)}
           />
         ))}
       </HorizontalScroll>

@@ -1,1 +1,13 @@
 project_id = "aciobzkkorfkjthogzeb"
+
+[functions.youtube-music-search]
+verify_jwt = false
+
+[functions.youtube-audio-stream]
+verify_jwt = false
+
+[functions.lyrics-search]
+verify_jwt = false
+
+[functions.trending-suggestions]
+verify_jwt = false
