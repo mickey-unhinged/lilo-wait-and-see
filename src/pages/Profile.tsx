@@ -1,5 +1,11 @@
-import { Settings, ChevronRight, LogOut, Moon, Bell, Shield, HelpCircle, Music } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Settings, ChevronRight, LogOut, Moon, Bell, Shield, HelpCircle, Music, User } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const menuItems = [
   { icon: Music, label: "Playback", description: "Audio quality, crossfade" },
@@ -10,16 +16,161 @@ const menuItems = [
 ];
 
 const Profile = () => {
-  // Mock user data
-  const user = {
-    name: "Alex Thompson",
-    username: "@alexthompson",
-    avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop",
+  const [user, setUser] = useState<any>(null);
+  const [activeSheet, setActiveSheet] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user || null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user || null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    toast({ title: "Signed out", description: "You've been logged out successfully." });
+    navigate("/auth");
+  };
+
+  // Mock user data for display
+  const displayUser = {
+    name: user?.user_metadata?.display_name || user?.email?.split("@")[0] || "Guest",
+    username: user?.email ? `@${user.email.split("@")[0]}` : "@guest",
+    avatarUrl: user?.user_metadata?.avatar_url || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop",
     followers: 248,
     following: 186,
     playlists: 24,
     isPremium: false,
   };
+
+  const SettingsSheet = ({ item }: { item: typeof menuItems[0] }) => (
+    <Sheet open={activeSheet === item.label} onOpenChange={(open) => setActiveSheet(open ? item.label : null)}>
+      <SheetTrigger asChild>
+        <button className="w-full flex items-center gap-4 p-4 rounded-2xl hover:bg-card/50 transition-colors">
+          <div className="w-10 h-10 rounded-xl bg-card flex items-center justify-center">
+            <item.icon className="w-5 h-5 text-muted-foreground" />
+          </div>
+          <div className="flex-1 text-left">
+            <p className="font-medium">{item.label}</p>
+            <p className="text-sm text-muted-foreground">{item.description}</p>
+          </div>
+          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+        </button>
+      </SheetTrigger>
+      <SheetContent side="bottom" className="rounded-t-3xl">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <item.icon className="w-5 h-5" />
+            {item.label}
+          </SheetTitle>
+        </SheetHeader>
+        <div className="py-6 space-y-4">
+          {item.label === "Playback" && (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">High Quality Audio</p>
+                  <p className="text-sm text-muted-foreground">Stream in 320kbps</p>
+                </div>
+                <Switch />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Crossfade</p>
+                  <p className="text-sm text-muted-foreground">Smooth transitions</p>
+                </div>
+                <Switch />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Gapless Playback</p>
+                  <p className="text-sm text-muted-foreground">No gaps between tracks</p>
+                </div>
+                <Switch defaultChecked />
+              </div>
+            </>
+          )}
+          {item.label === "Notifications" && (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Push Notifications</p>
+                  <p className="text-sm text-muted-foreground">New releases, updates</p>
+                </div>
+                <Switch defaultChecked />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Email Updates</p>
+                  <p className="text-sm text-muted-foreground">Weekly digest</p>
+                </div>
+                <Switch />
+              </div>
+            </>
+          )}
+          {item.label === "Privacy" && (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Personalized Recommendations</p>
+                  <p className="text-sm text-muted-foreground">Better suggestions</p>
+                </div>
+                <Switch defaultChecked />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Share Listening Activity</p>
+                  <p className="text-sm text-muted-foreground">Friends can see</p>
+                </div>
+                <Switch />
+              </div>
+            </>
+          )}
+          {item.label === "Appearance" && (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Dark Mode</p>
+                  <p className="text-sm text-muted-foreground">Always on</p>
+                </div>
+                <Switch defaultChecked />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Reduce Motion</p>
+                  <p className="text-sm text-muted-foreground">Less animations</p>
+                </div>
+                <Switch />
+              </div>
+            </>
+          )}
+          {item.label === "Help & Support" && (
+            <div className="space-y-3">
+              <button className="w-full p-4 rounded-xl bg-card/50 hover:bg-card text-left transition-colors">
+                <p className="font-medium">FAQ</p>
+                <p className="text-sm text-muted-foreground">Common questions</p>
+              </button>
+              <button className="w-full p-4 rounded-xl bg-card/50 hover:bg-card text-left transition-colors">
+                <p className="font-medium">Contact Support</p>
+                <p className="text-sm text-muted-foreground">Get help from our team</p>
+              </button>
+              <button className="w-full p-4 rounded-xl bg-card/50 hover:bg-card text-left transition-colors">
+                <p className="font-medium">Report a Problem</p>
+                <p className="text-sm text-muted-foreground">Let us know about issues</p>
+              </button>
+            </div>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
 
   return (
     <AppLayout>
@@ -35,17 +186,32 @@ const Profile = () => {
         {/* User card */}
         <div className="glass rounded-3xl p-6 mb-6">
           <div className="flex items-center gap-4 mb-6">
-            <img
-              src={user.avatarUrl}
-              alt={user.name}
-              className="w-20 h-20 rounded-full object-cover border-2 border-primary"
-            />
+            {user ? (
+              <img
+                src={displayUser.avatarUrl}
+                alt={displayUser.name}
+                className="w-20 h-20 rounded-full object-cover border-2 border-primary"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-full bg-card flex items-center justify-center border-2 border-border">
+                <User className="w-8 h-8 text-muted-foreground" />
+              </div>
+            )}
             <div className="flex-1">
-              <h2 className="text-xl font-bold">{user.name}</h2>
-              <p className="text-muted-foreground">{user.username}</p>
-              {!user.isPremium && (
-                <button className="mt-2 px-4 py-1.5 text-xs font-semibold gradient-bg text-primary-foreground rounded-full">
-                  Upgrade to Premium
+              <h2 className="text-xl font-bold">{displayUser.name}</h2>
+              <p className="text-muted-foreground">{displayUser.username}</p>
+              {user ? (
+                !displayUser.isPremium && (
+                  <button className="mt-2 px-4 py-1.5 text-xs font-semibold gradient-bg text-primary-foreground rounded-full">
+                    Upgrade to Premium
+                  </button>
+                )
+              ) : (
+                <button 
+                  onClick={() => navigate("/auth")}
+                  className="mt-2 px-4 py-1.5 text-xs font-semibold gradient-bg text-primary-foreground rounded-full"
+                >
+                  Sign In
                 </button>
               )}
             </div>
@@ -54,15 +220,15 @@ const Profile = () => {
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4 text-center">
             <div className="p-3 rounded-2xl bg-card/50">
-              <p className="text-xl font-bold">{user.playlists}</p>
+              <p className="text-xl font-bold">{displayUser.playlists}</p>
               <p className="text-xs text-muted-foreground">Playlists</p>
             </div>
             <div className="p-3 rounded-2xl bg-card/50">
-              <p className="text-xl font-bold">{user.followers}</p>
+              <p className="text-xl font-bold">{displayUser.followers}</p>
               <p className="text-xs text-muted-foreground">Followers</p>
             </div>
             <div className="p-3 rounded-2xl bg-card/50">
-              <p className="text-xl font-bold">{user.following}</p>
+              <p className="text-xl font-bold">{displayUser.following}</p>
               <p className="text-xs text-muted-foreground">Following</p>
             </div>
           </div>
@@ -71,29 +237,22 @@ const Profile = () => {
         {/* Menu items */}
         <div className="space-y-2">
           {menuItems.map((item) => (
-            <button
-              key={item.label}
-              className="w-full flex items-center gap-4 p-4 rounded-2xl hover:bg-card/50 transition-colors"
-            >
-              <div className="w-10 h-10 rounded-xl bg-card flex items-center justify-center">
-                <item.icon className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <div className="flex-1 text-left">
-                <p className="font-medium">{item.label}</p>
-                <p className="text-sm text-muted-foreground">{item.description}</p>
-              </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground" />
-            </button>
+            <SettingsSheet key={item.label} item={item} />
           ))}
         </div>
         
         {/* Sign out */}
-        <button className="w-full flex items-center gap-4 p-4 mt-4 rounded-2xl text-destructive hover:bg-destructive/10 transition-colors">
-          <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
-            <LogOut className="w-5 h-5" />
-          </div>
-          <span className="font-medium">Sign Out</span>
-        </button>
+        {user && (
+          <button 
+            onClick={handleSignOut}
+            className="w-full flex items-center gap-4 p-4 mt-4 rounded-2xl text-destructive hover:bg-destructive/10 transition-colors"
+          >
+            <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
+              <LogOut className="w-5 h-5" />
+            </div>
+            <span className="font-medium">Sign Out</span>
+          </button>
+        )}
         
         {/* Version */}
         <p className="text-center text-xs text-muted-foreground mt-8">

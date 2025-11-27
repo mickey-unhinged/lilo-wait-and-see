@@ -1,4 +1,6 @@
 import { Play } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { usePlayer } from "@/contexts/PlayerContext";
 
 interface QuickAccessItem {
   id: string;
@@ -9,7 +11,7 @@ interface QuickAccessItem {
 
 const quickAccessItems: QuickAccessItem[] = [
   {
-    id: "1",
+    id: "liked",
     title: "Liked Songs",
     imageUrl: "https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=100&h=100&fit=crop",
     type: "playlist",
@@ -22,37 +24,47 @@ const quickAccessItems: QuickAccessItem[] = [
   },
   {
     id: "3",
-    title: "Luna Echo",
-    imageUrl: "https://images.unsplash.com/photo-1614149162883-504ce4d13909?w=100&h=100&fit=crop",
-    type: "artist",
-  },
-  {
-    id: "4",
     title: "Night Drive",
     imageUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=100&h=100&fit=crop",
     type: "playlist",
   },
   {
-    id: "5",
+    id: "4",
     title: "Workout Mix",
     imageUrl: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=100&h=100&fit=crop",
     type: "playlist",
   },
   {
-    id: "6",
+    id: "5",
     title: "Focus Flow",
     imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
     type: "playlist",
   },
+  {
+    id: "artist-1",
+    title: "Luna Echo",
+    imageUrl: "https://images.unsplash.com/photo-1614149162883-504ce4d13909?w=100&h=100&fit=crop",
+    type: "artist",
+  },
 ];
 
 export function QuickAccessGrid() {
+  const navigate = useNavigate();
+  
+  const handleItemClick = (item: QuickAccessItem) => {
+    if (item.type === "playlist") {
+      navigate(`/playlist/${item.id}`);
+    }
+    // Artists and albums can be handled later
+  };
+
   return (
     <section className="px-4 py-6">
       <div className="grid grid-cols-2 gap-3">
         {quickAccessItems.map((item) => (
           <button
             key={item.id}
+            onClick={() => handleItemClick(item)}
             className="flex items-center gap-3 bg-card/50 hover:bg-card/80 rounded-xl overflow-hidden transition-all duration-300 group"
           >
             <img
