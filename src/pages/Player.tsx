@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { demoTracks } from "@/hooks/useTracks";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { LyricsPanel } from "@/components/player/LyricsPanel";
 import { VideoPreview } from "@/components/player/VideoPreview";
 
@@ -134,14 +134,14 @@ const Player = () => {
           </div>
         </div>
         
-        {/* Track info */}
+        {/* Track info with action buttons */}
         <div className="px-8 mb-6">
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
               <h1 className="text-2xl font-bold font-display truncate">{track?.title || "No Track"}</h1>
               <p className="text-muted-foreground truncate">{track?.artist_name || "Unknown Artist"}</p>
             </div>
-            <div className="flex items-center gap-2 ml-4">
+            <div className="flex items-center gap-1 ml-4">
               <button
                 onClick={() => setIsLiked(!isLiked)}
                 className={cn(
@@ -151,10 +151,50 @@ const Player = () => {
               >
                 <Heart className="w-6 h-6" fill={isLiked ? "currentColor" : "none"} />
               </button>
-              <button className="p-2 rounded-full text-muted-foreground hover:text-foreground transition-colors">
-                <Share2 className="w-5 h-5" />
-              </button>
             </div>
+          </div>
+          
+          {/* Lyrics & Video buttons - Spotify style */}
+          <div className="flex items-center gap-2 mt-4">
+            <Sheet>
+              <SheetTrigger asChild>
+                <button className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/40 hover:bg-muted/60 text-sm font-medium transition-colors">
+                  <Music2 className="w-4 h-4" />
+                  Lyrics
+                </button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="h-[70vh] rounded-t-3xl">
+                <SheetHeader className="pb-4">
+                  <SheetTitle className="text-center">Lyrics</SheetTitle>
+                </SheetHeader>
+                <div className="h-[calc(100%-4rem)]">
+                  <LyricsPanel title={track?.title} artist={track?.artist_name} />
+                </div>
+              </SheetContent>
+            </Sheet>
+            
+            {track?.videoId && (
+              <Sheet>
+                <SheetTrigger asChild>
+                  <button className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/40 hover:bg-muted/60 text-sm font-medium transition-colors">
+                    <Video className="w-4 h-4" />
+                    Video
+                  </button>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="h-[70vh] rounded-t-3xl">
+                  <SheetHeader className="pb-4">
+                    <SheetTitle className="text-center">Video</SheetTitle>
+                  </SheetHeader>
+                  <div className="h-[calc(100%-4rem)] px-4">
+                    <VideoPreview videoId={track?.videoId} title={track?.title} />
+                  </div>
+                </SheetContent>
+              </Sheet>
+            )}
+            
+            <button className="p-2 rounded-full text-muted-foreground hover:text-foreground transition-colors ml-auto">
+              <Share2 className="w-5 h-5" />
+            </button>
           </div>
         </div>
         
@@ -232,7 +272,7 @@ const Player = () => {
         </div>
         
         {/* Bottom controls */}
-        <div className="flex items-center justify-between px-8 pb-4">
+        <div className="flex items-center justify-between px-8 pb-8">
           <button className="p-2 text-muted-foreground hover:text-foreground transition-colors">
             <ListMusic className="w-5 h-5" />
           </button>
@@ -248,26 +288,6 @@ const Player = () => {
             />
           </div>
         </div>
-
-        {/* Lyrics & Video Tabs */}
-        <Tabs defaultValue="lyrics" className="px-4 pb-8">
-          <TabsList className="w-full grid grid-cols-2 bg-muted/30">
-            <TabsTrigger value="lyrics" className="gap-2">
-              <Music2 className="w-4 h-4" />
-              Lyrics
-            </TabsTrigger>
-            <TabsTrigger value="video" className="gap-2">
-              <Video className="w-4 h-4" />
-              Video
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="lyrics" className="mt-4 h-64 rounded-xl bg-muted/20 border border-border/30">
-            <LyricsPanel title={track?.title} artist={track?.artist_name} />
-          </TabsContent>
-          <TabsContent value="video" className="mt-4 p-4 rounded-xl bg-muted/20 border border-border/30">
-            <VideoPreview videoId={track?.videoId} title={track?.title} />
-          </TabsContent>
-        </Tabs>
       </div>
     </div>
   );
