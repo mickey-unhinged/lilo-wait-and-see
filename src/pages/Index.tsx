@@ -6,6 +6,7 @@ import { ForYouSection } from "@/components/home/ForYouSection";
 import { TrendingSection } from "@/components/home/TrendingSection";
 import { TopArtistsSection } from "@/components/home/TopArtistsSection";
 import { Watermark } from "@/components/common/Watermark";
+import { FriendsActivity } from "@/components/home/FriendsActivity";
 
 const Index = () => {
   return (
@@ -14,6 +15,7 @@ const Index = () => {
       <QuickAccessGrid />
       <RecentlyPlayedSection />
       <ForYouSection />
+      <FriendsActivity />
       <TrendingSection />
       <TopArtistsSection />
       

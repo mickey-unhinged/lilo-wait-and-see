@@ -13,6 +13,7 @@ import { VideoPreview } from "@/components/player/VideoPreview";
 import { useToast } from "@/hooks/use-toast";
 import { Watermark } from "@/components/common/Watermark";
 import { ShareToFriendsSheet } from "@/components/inbox/ShareToFriendsSheet";
+import { AddToPlaylistSheet } from "@/components/playlist/AddToPlaylistSheet";
 
 function formatTime(seconds: number): string {
   if (!seconds || isNaN(seconds)) return "0:00";
@@ -50,6 +51,7 @@ const Player = () => {
   const [showQueue, setShowQueue] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
   const [showShareSheet, setShowShareSheet] = useState(false);
+  const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
   
   // Auto-play first demo track if no track is loaded
   useEffect(() => {
@@ -93,7 +95,7 @@ const Player = () => {
   };
 
   const handleAddToPlaylist = () => {
-    toast({ title: "Coming soon", description: "Add to playlist feature is coming soon!" });
+    setShowAddToPlaylist(true);
   };
 
   const handleGoToArtist = () => {
@@ -433,6 +435,13 @@ const Player = () => {
       <ShareToFriendsSheet
         isOpen={showShareSheet}
         onClose={() => setShowShareSheet(false)}
+        track={track}
+      />
+
+      {/* Add to Playlist Sheet */}
+      <AddToPlaylistSheet
+        isOpen={showAddToPlaylist}
+        onClose={() => setShowAddToPlaylist(false)}
         track={track}
       />
     </div>

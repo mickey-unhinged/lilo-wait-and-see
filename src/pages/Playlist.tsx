@@ -8,6 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { CollaboratorInvite } from "@/components/playlist/CollaboratorInvite";
 import { Switch } from "@/components/ui/switch";
+import { AddSongsToPlaylist } from "@/components/playlist/AddSongsToPlaylist";
+import { PlaylistCoverUpload } from "@/components/playlist/PlaylistCoverUpload";
 
 const formatDuration = (ms: number) => {
   const minutes = Math.floor(ms / 60000);
@@ -189,6 +191,18 @@ const Playlist = () => {
                 <Heart className="w-20 h-20 text-primary-foreground" />
               </div>
             )}
+            
+            {/* Cover upload (only for playlist owner) */}
+            {!isLikedSongs && isOwner && id && (
+              <div className="mb-4">
+                <PlaylistCoverUpload
+                  playlistId={id}
+                  currentCover={playlistInfo?.cover_url || null}
+                  onUploadComplete={() => refetchPlaylist()}
+                />
+              </div>
+            )}
+            
             <h1 className="text-2xl font-bold font-display mb-2">{playlistInfo?.title || "Playlist"}</h1>
             <p className="text-muted-foreground text-sm mb-4">{playlistInfo?.description || ""}</p>
             <p className="text-xs text-muted-foreground">{tracks?.length || 0} songs</p>
@@ -232,6 +246,13 @@ const Playlist = () => {
       
       {/* Track list */}
       <div className="px-4 pb-8">
+        {/* Add songs button for playlist owner/collaborators */}
+        {!isLikedSongs && id && (isOwner || isCollaborative) && (
+          <div className="flex justify-end mb-4">
+            <AddSongsToPlaylist playlistId={id} />
+          </div>
+        )}
+        
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />

@@ -94,6 +94,11 @@ export function Equalizer() {
       // Create audio context
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       const audioContext = audioContextRef.current;
+      
+      // Resume audio context if suspended (important for playback to continue)
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
 
       // Create source node from audio element
       sourceNodeRef.current = audioContext.createMediaElementSource(audioElement);
@@ -154,6 +159,11 @@ export function Equalizer() {
 
   // Update filter gains when bands change
   useEffect(() => {
+    // Resume audio context if suspended when adjusting EQ
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume();
+    }
+    
     filtersRef.current.forEach((filter, index) => {
       if (filter && bands[index]) {
         filter.gain.value = isEnabled ? bands[index].gain : 0;
