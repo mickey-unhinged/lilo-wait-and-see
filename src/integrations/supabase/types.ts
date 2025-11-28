@@ -384,6 +384,36 @@ export type Database = {
         }
         Relationships: []
       }
+      shared_songs: {
+        Row: {
+          created_at: string
+          id: string
+          message: string | null
+          read_at: string | null
+          recipient_id: string
+          sender_id: string
+          track_data: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message?: string | null
+          read_at?: string | null
+          recipient_id: string
+          sender_id: string
+          track_data: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string | null
+          read_at?: string | null
+          recipient_id?: string
+          sender_id?: string
+          track_data?: Json
+        }
+        Relationships: []
+      }
       track_genres: {
         Row: {
           genre_id: string

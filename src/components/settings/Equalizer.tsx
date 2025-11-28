@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { RotateCcw } from "lucide-react";
+import { usePlayer } from "@/contexts/PlayerContext";
 
 interface EqualizerBand {
   frequency: number;
@@ -32,48 +33,96 @@ const PRESETS = {
   acoustic: [4, 3, 1, 1, 2, 2, 3, 3, 3, 2],
 };
 
-interface EqualizerProps {
-  audioContext?: AudioContext | null;
-  sourceNode?: MediaElementAudioSourceNode | null;
-}
+const EQ_STORAGE_KEY = "lilo-equalizer-settings";
 
-export function Equalizer({ audioContext, sourceNode }: EqualizerProps) {
-  const [bands, setBands] = useState<EqualizerBand[]>(DEFAULT_BANDS);
-  const [selectedPreset, setSelectedPreset] = useState<string>("flat");
-  const [isEnabled, setIsEnabled] = useState(true);
+export function Equalizer() {
+  const { audioElement } = usePlayer();
+  const [bands, setBands] = useState<EqualizerBand[]>(() => {
+    // Try to load saved settings
+    try {
+      const saved = localStorage.getItem(EQ_STORAGE_KEY);
+      if (saved) {
+        const { bands: savedBands, preset } = JSON.parse(saved);
+        if (savedBands) return savedBands;
+      }
+    } catch (e) {}
+    return DEFAULT_BANDS;
+  });
+  const [selectedPreset, setSelectedPreset] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(EQ_STORAGE_KEY);
+      if (saved) {
+        const { preset } = JSON.parse(saved);
+        return preset || "flat";
+      }
+    } catch (e) {}
+    return "flat";
+  });
+  const [isEnabled, setIsEnabled] = useState(() => {
+    try {
+      const saved = localStorage.getItem(EQ_STORAGE_KEY);
+      if (saved) {
+        const { enabled } = JSON.parse(saved);
+        return enabled !== false;
+      }
+    } catch (e) {}
+    return true;
+  });
+  
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const filtersRef = useRef<BiquadFilterNode[]>([]);
   const gainNodeRef = useRef<GainNode | null>(null);
+  const isConnectedRef = useRef(false);
 
-  // Initialize EQ filters
+  // Save settings whenever they change
   useEffect(() => {
-    if (!audioContext) return;
+    try {
+      localStorage.setItem(EQ_STORAGE_KEY, JSON.stringify({
+        bands,
+        preset: selectedPreset,
+        enabled: isEnabled,
+      }));
+    } catch (e) {}
+  }, [bands, selectedPreset, isEnabled]);
 
-    // Create filters for each band
-    filtersRef.current = bands.map((band, index) => {
-      const filter = audioContext.createBiquadFilter();
-      
-      if (index === 0) {
-        filter.type = "lowshelf";
-      } else if (index === bands.length - 1) {
-        filter.type = "highshelf";
-      } else {
-        filter.type = "peaking";
-        filter.Q.value = 1.4;
-      }
-      
-      filter.frequency.value = band.frequency;
-      filter.gain.value = band.gain;
-      
-      return filter;
-    });
+  // Initialize and connect EQ to audio element
+  useEffect(() => {
+    if (!audioElement || isConnectedRef.current) return;
 
-    // Create gain node
-    gainNodeRef.current = audioContext.createGain();
-    gainNodeRef.current.gain.value = 1;
+    try {
+      // Create audio context
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioContext = audioContextRef.current;
 
-    // Connect filters in series
-    if (sourceNode && filtersRef.current.length > 0) {
-      let lastNode: AudioNode = sourceNode;
+      // Create source node from audio element
+      sourceNodeRef.current = audioContext.createMediaElementSource(audioElement);
+
+      // Create filters for each band
+      filtersRef.current = bands.map((band, index) => {
+        const filter = audioContext.createBiquadFilter();
+        
+        if (index === 0) {
+          filter.type = "lowshelf";
+        } else if (index === bands.length - 1) {
+          filter.type = "highshelf";
+        } else {
+          filter.type = "peaking";
+          filter.Q.value = 1.4;
+        }
+        
+        filter.frequency.value = band.frequency;
+        filter.gain.value = isEnabled ? band.gain : 0;
+        
+        return filter;
+      });
+
+      // Create gain node
+      gainNodeRef.current = audioContext.createGain();
+      gainNodeRef.current.gain.value = 1;
+
+      // Connect nodes in series: source -> filters -> gain -> destination
+      let lastNode: AudioNode = sourceNodeRef.current;
       
       filtersRef.current.forEach((filter) => {
         lastNode.connect(filter);
@@ -82,19 +131,26 @@ export function Equalizer({ audioContext, sourceNode }: EqualizerProps) {
       
       lastNode.connect(gainNodeRef.current);
       gainNodeRef.current.connect(audioContext.destination);
+
+      isConnectedRef.current = true;
+      console.log("Equalizer connected to audio element");
+    } catch (e) {
+      console.error("Failed to initialize equalizer:", e);
     }
 
     return () => {
-      filtersRef.current.forEach((filter) => {
-        try {
-          filter.disconnect();
-        } catch (e) {}
-      });
+      // Cleanup on unmount
       try {
-        gainNodeRef.current?.disconnect();
+        filtersRef.current.forEach((filter) => {
+          try { filter.disconnect(); } catch (e) {}
+        });
+        try { gainNodeRef.current?.disconnect(); } catch (e) {}
+        try { sourceNodeRef.current?.disconnect(); } catch (e) {}
+        try { audioContextRef.current?.close(); } catch (e) {}
+        isConnectedRef.current = false;
       } catch (e) {}
     };
-  }, [audioContext, sourceNode]);
+  }, [audioElement]);
 
   // Update filter gains when bands change
   useEffect(() => {
@@ -137,6 +193,12 @@ export function Equalizer({ audioContext, sourceNode }: EqualizerProps) {
           {isEnabled ? "On" : "Off"}
         </Button>
       </div>
+
+      {!audioElement && (
+        <p className="text-sm text-muted-foreground bg-card/50 p-3 rounded-lg">
+          Play a song to activate the equalizer
+        </p>
+      )}
 
       {/* Presets */}
       <div className="space-y-2">

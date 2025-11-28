@@ -44,6 +44,7 @@ interface PlayerContextType extends PlayerState {
   setQueue: (tracks: Track[]) => void;
   addToQueue: (track: Track) => void;
   playTrack: (track: Track, queue?: Track[]) => void;
+  audioElement: HTMLAudioElement | null;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -59,6 +60,8 @@ export function usePlayer() {
 interface PlayerProviderProps {
   children: React.ReactNode;
 }
+
+const PLAYBACK_STATE_KEY = "lilo-playback-state";
 
 // Helper to save to play history
 function saveToPlayHistory(track: Track) {
@@ -89,19 +92,80 @@ function saveToPlayHistory(track: Track) {
   }
 }
 
+// Helper to save playback state
+function savePlaybackState(state: { track: Track | null; progress: number; queue: Track[] }) {
+  try {
+    localStorage.setItem(PLAYBACK_STATE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.error("Failed to save playback state:", e);
+  }
+}
+
+// Helper to load playback state
+function loadPlaybackState(): { track: Track | null; progress: number; queue: Track[] } | null {
+  try {
+    const stored = localStorage.getItem(PLAYBACK_STATE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.error("Failed to load playback state:", e);
+  }
+  return null;
+}
+
+// Setup Media Session API
+function updateMediaSession(track: Track | null, isPlaying: boolean, handlers: {
+  onPlay: () => void;
+  onPause: () => void;
+  onNext: () => void;
+  onPrevious: () => void;
+  onSeek: (time: number) => void;
+}) {
+  if (!("mediaSession" in navigator) || !track) return;
+
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: track.title,
+    artist: track.artist_name,
+    album: track.album_title || "",
+    artwork: [
+      { src: track.cover_url || track.album_cover || "", sizes: "512x512", type: "image/jpeg" },
+    ],
+  });
+
+  navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+
+  navigator.mediaSession.setActionHandler("play", handlers.onPlay);
+  navigator.mediaSession.setActionHandler("pause", handlers.onPause);
+  navigator.mediaSession.setActionHandler("previoustrack", handlers.onPrevious);
+  navigator.mediaSession.setActionHandler("nexttrack", handlers.onNext);
+  navigator.mediaSession.setActionHandler("seekto", (details) => {
+    if (details.seekTime !== undefined) {
+      handlers.onSeek(details.seekTime);
+    }
+  });
+}
+
 export function PlayerProvider({ children }: PlayerProviderProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [state, setState] = useState<PlayerState>({
-    currentTrack: null,
-    queue: [],
-    isPlaying: false,
-    progress: 0,
-    duration: 0,
-    volume: 0.8,
-    isShuffle: false,
-    repeatMode: "off",
-    isLoading: false,
+  const [state, setState] = useState<PlayerState>(() => {
+    // Try to restore previous state
+    const saved = loadPlaybackState();
+    return {
+      currentTrack: saved?.track || null,
+      queue: saved?.queue || [],
+      isPlaying: false, // Always start paused
+      progress: saved?.progress || 0,
+      duration: 0,
+      volume: 0.8,
+      isShuffle: false,
+      repeatMode: "off",
+      isLoading: false,
+    };
   });
+
+  // Reference to next function for the ended handler
+  const nextRef = useRef<() => void>(() => {});
 
   // Initialize audio element
   useEffect(() => {
@@ -111,11 +175,22 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     const audio = audioRef.current;
     
     const handleTimeUpdate = () => {
-      setState(prev => ({
-        ...prev,
-        progress: audio.currentTime,
-        duration: audio.duration || 0,
-      }));
+      setState(prev => {
+        const newState = {
+          ...prev,
+          progress: audio.currentTime,
+          duration: audio.duration || 0,
+        };
+        // Save playback state periodically
+        if (prev.currentTrack && Math.floor(audio.currentTime) % 5 === 0) {
+          savePlaybackState({
+            track: prev.currentTrack,
+            progress: audio.currentTime,
+            queue: prev.queue,
+          });
+        }
+        return newState;
+      });
     };
     
     const handleLoadedMetadata = () => {
@@ -127,12 +202,16 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     };
     
     const handleEnded = () => {
-      // Handle track end based on repeat mode
       setState(prev => {
         if (prev.repeatMode === "one") {
           audio.currentTime = 0;
           audio.play();
           return prev;
+        }
+        // Auto-play next track
+        if (prev.queue.length > 0) {
+          // Call next() after state update
+          setTimeout(() => nextRef.current(), 0);
         }
         return { ...prev, isPlaying: false };
       });
@@ -169,6 +248,43 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
       audioRef.current.volume = state.volume;
     }
   }, [state.volume]);
+
+  // Restore track on mount if there was a saved state
+  useEffect(() => {
+    const saved = loadPlaybackState();
+    if (saved?.track && audioRef.current) {
+      // Load the track but don't play it
+      const loadSavedTrack = async () => {
+        let audioUrl = saved.track?.audio_url;
+        
+        if (saved.track?.videoId && !audioUrl) {
+          try {
+            const { data, error } = await supabase.functions.invoke("youtube-audio-stream", {
+              body: { videoId: saved.track.videoId },
+            });
+            if (!error && data?.audioUrl) {
+              audioUrl = data.audioUrl;
+            }
+          } catch (err) {
+            console.error("Failed to restore audio URL:", err);
+          }
+        }
+        
+        if (audioUrl && audioRef.current) {
+          audioRef.current.src = audioUrl;
+          audioRef.current.load();
+          // Set the saved progress
+          audioRef.current.addEventListener("loadedmetadata", () => {
+            if (audioRef.current && saved.progress) {
+              audioRef.current.currentTime = saved.progress;
+            }
+          }, { once: true });
+        }
+      };
+      
+      loadSavedTrack();
+    }
+  }, []);
 
   const play = useCallback(async (track?: Track) => {
     const audio = audioRef.current;
@@ -217,7 +333,17 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
 
   const pause = useCallback(() => {
     audioRef.current?.pause();
-    setState(prev => ({ ...prev, isPlaying: false }));
+    setState(prev => {
+      // Save playback state when pausing
+      if (prev.currentTrack) {
+        savePlaybackState({
+          track: prev.currentTrack,
+          progress: prev.progress,
+          queue: prev.queue,
+        });
+      }
+      return { ...prev, isPlaying: false };
+    });
   }, []);
 
   const toggle = useCallback(() => {
@@ -260,7 +386,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
   }, []);
 
   const next = useCallback(() => {
-    const { queue, currentTrack, isShuffle } = state;
+    const { queue, currentTrack, isShuffle, repeatMode } = state;
     if (queue.length === 0) return;
     
     const currentIndex = queue.findIndex(t => t.id === currentTrack?.id);
@@ -269,7 +395,15 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     if (isShuffle) {
       nextIndex = Math.floor(Math.random() * queue.length);
     } else {
-      nextIndex = (currentIndex + 1) % queue.length;
+      nextIndex = currentIndex + 1;
+      // If we've reached the end
+      if (nextIndex >= queue.length) {
+        if (repeatMode === "all") {
+          nextIndex = 0; // Loop back to start
+        } else {
+          return; // Stop at end
+        }
+      }
     }
     
     const nextTrack = queue[nextIndex];
@@ -277,6 +411,11 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
       play(nextTrack);
     }
   }, [state, play]);
+
+  // Update the ref whenever next changes
+  useEffect(() => {
+    nextRef.current = next;
+  }, [next]);
 
   const previous = useCallback(() => {
     const { queue, currentTrack, progress } = state;
@@ -305,6 +444,17 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     play(track);
   }, [play, setQueue]);
 
+  // Update media session whenever track or playing state changes
+  useEffect(() => {
+    updateMediaSession(state.currentTrack, state.isPlaying, {
+      onPlay: () => play(),
+      onPause: pause,
+      onNext: next,
+      onPrevious: previous,
+      onSeek: seek,
+    });
+  }, [state.currentTrack, state.isPlaying, play, pause, next, previous, seek]);
+
   const value: PlayerContextType = {
     ...state,
     play,
@@ -319,6 +469,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     setQueue,
     addToQueue,
     playTrack,
+    audioElement: audioRef.current,
   };
 
   return (
