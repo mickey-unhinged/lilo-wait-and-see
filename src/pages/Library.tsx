@@ -75,14 +75,35 @@ const Library = () => {
   const fetchPlaylists = async (userId: string) => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      // Fetch owned playlists
+      const { data: ownedPlaylists, error: ownedError } = await supabase
         .from("playlists")
         .select("id, title, description, cover_url, is_collaborative, is_public")
         .eq("owner_id", userId)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
-      setPlaylists(data || []);
+      if (ownedError) throw ownedError;
+
+      // Fetch collaborative playlists where user is accepted collaborator
+      const { data: collabData, error: collabError } = await supabase
+        .from("playlist_collaborators")
+        .select(`
+          playlists (
+            id, title, description, cover_url, is_collaborative, is_public
+          )
+        `)
+        .eq("user_id", userId)
+        .not("accepted_at", "is", null);
+
+      if (collabError) throw collabError;
+
+      const collaborativePlaylists = collabData?.map(c => c.playlists).filter(Boolean) as Playlist[] || [];
+      const allPlaylists = [...(ownedPlaylists || []), ...collaborativePlaylists];
+      
+      // Remove duplicates
+      const uniquePlaylists = Array.from(new Map(allPlaylists.map(p => [p.id, p])).values());
+      
+      setPlaylists(uniquePlaylists);
     } catch (error) {
       console.error("Failed to fetch playlists:", error);
     } finally {

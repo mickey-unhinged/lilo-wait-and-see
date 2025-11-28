@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { usePlayer, Track } from "@/contexts/PlayerContext";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { formatDistanceToNow } from "date-fns";
+import { AddToPlaylistSheet } from "@/components/playlist/AddToPlaylistSheet";
 
 interface SharedSong {
   id: string;
@@ -41,6 +42,8 @@ export function InboxSheet({ children }: InboxSheetProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
+  const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
   const { toast } = useToast();
   const { playTrack } = usePlayer();
   const { toggleLike, isLiked } = useLikedSongs();
@@ -153,6 +156,20 @@ export function InboxSheet({ children }: InboxSheetProps) {
     });
   };
 
+  const handleAddToPlaylist = (share: SharedSong) => {
+    const track: Track = {
+      id: share.track_data.id,
+      title: share.track_data.title,
+      artist_id: share.track_data.id,
+      artist_name: share.track_data.artist_name,
+      cover_url: share.track_data.cover_url,
+      videoId: share.track_data.videoId,
+      duration_ms: share.track_data.duration_ms,
+    };
+    setSelectedTrack(track);
+    setShowAddToPlaylist(true);
+  };
+
   const handleDelete = async (shareId: string) => {
     try {
       const { error } = await supabase
@@ -257,6 +274,13 @@ export function InboxSheet({ children }: InboxSheetProps) {
                   </Button>
                   <Button
                     size="sm"
+                    variant="outline"
+                    onClick={() => handleAddToPlaylist(share)}
+                  >
+                    <ListPlus className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    size="sm"
                     variant="ghost"
                     onClick={() => handleDelete(share.id)}
                     className="ml-auto text-muted-foreground hover:text-destructive"
@@ -269,6 +293,12 @@ export function InboxSheet({ children }: InboxSheetProps) {
           )}
         </div>
       </SheetContent>
+      
+      <AddToPlaylistSheet
+        isOpen={showAddToPlaylist}
+        onClose={() => setShowAddToPlaylist(false)}
+        track={selectedTrack}
+      />
     </Sheet>
   );
 }
