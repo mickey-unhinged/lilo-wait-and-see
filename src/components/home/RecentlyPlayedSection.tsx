@@ -74,6 +74,7 @@ export function RecentlyPlayedSection() {
       <SectionHeader 
         title="Recently Played" 
         subtitle="Jump back in"
+        sectionKey="recently-played"
       />
       <HorizontalScroll>
         {recentTracks.map((track, index) => (

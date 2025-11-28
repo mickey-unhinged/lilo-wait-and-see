@@ -12,6 +12,7 @@ import { LyricsPanel } from "@/components/player/LyricsPanel";
 import { VideoPreview } from "@/components/player/VideoPreview";
 import { useToast } from "@/hooks/use-toast";
 import { Watermark } from "@/components/common/Watermark";
+import { ShareToFriendsSheet } from "@/components/inbox/ShareToFriendsSheet";
 
 function formatTime(seconds: number): string {
   if (!seconds || isNaN(seconds)) return "0:00";
@@ -48,6 +49,7 @@ const Player = () => {
   const [bars, setBars] = useState<number[]>(Array(40).fill(0.5));
   const [showQueue, setShowQueue] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
+  const [showShareSheet, setShowShareSheet] = useState(false);
   
   // Auto-play first demo track if no track is loaded
   useEffect(() => {
@@ -86,23 +88,8 @@ const Player = () => {
     }
   };
 
-  const handleShare = async () => {
-    if (track) {
-      try {
-        if (navigator.share) {
-          await navigator.share({
-            title: track.title,
-            text: `Check out "${track.title}" by ${track.artist_name} on Lilo!`,
-            url: window.location.href,
-          });
-        } else {
-          await navigator.clipboard.writeText(`Check out "${track.title}" by ${track.artist_name} on Lilo! ${window.location.href}`);
-          toast({ title: "Link copied!", description: "Share link copied to clipboard" });
-        }
-      } catch (err) {
-        console.error("Share failed:", err);
-      }
-    }
+  const handleShare = () => {
+    setShowShareSheet(true);
   };
 
   const handleAddToPlaylist = () => {
@@ -441,6 +428,13 @@ const Player = () => {
           <Watermark variant="subtle" />
         </div>
       </div>
+
+      {/* Share to Friends Sheet */}
+      <ShareToFriendsSheet
+        isOpen={showShareSheet}
+        onClose={() => setShowShareSheet(false)}
+        track={track}
+      />
     </div>
   );
 };

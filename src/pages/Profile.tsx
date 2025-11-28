@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, ChevronRight, LogOut, Moon, Bell, Shield, HelpCircle, Music, User, Sun, Volume2, Info, Mail, MessageSquare, Bug, ExternalLink, Users, Sliders } from "lucide-react";
+import { Settings, ChevronRight, LogOut, Moon, Bell, Shield, HelpCircle, Music, User, Sun, Volume2, Info, Mail, MessageSquare, Bug, ExternalLink, Users, Sliders, Inbox } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -15,6 +15,8 @@ import { useProfileStats } from "@/hooks/useProfileStats";
 import { UserSearchSheet } from "@/components/profile/UserSearchSheet";
 import { AvatarUpload } from "@/components/profile/AvatarUpload";
 import { Equalizer } from "@/components/settings/Equalizer";
+import { FollowersSheet } from "@/components/profile/FollowersSheet";
+import { InboxSheet } from "@/components/inbox/InboxSheet";
 
 const Profile = () => {
   const [user, setUser] = useState<any>(null);
@@ -389,12 +391,15 @@ const Profile = () => {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold font-display">Profile</h1>
-          <button 
-            onClick={() => setShowSettingsSheet(true)}
-            className="p-2 rounded-full hover:bg-card transition-colors"
-          >
-            <Settings className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-2">
+            <InboxSheet />
+            <button 
+              onClick={() => setShowSettingsSheet(true)}
+              className="p-2 rounded-full hover:bg-card transition-colors"
+            >
+              <Settings className="w-6 h-6" />
+            </button>
+          </div>
         </div>
         
         {/* User card */}
@@ -444,14 +449,32 @@ const Profile = () => {
               <p className="text-xl font-bold">{profileStats.playlists}</p>
               <p className="text-xs text-muted-foreground">Playlists</p>
             </div>
-            <div className="p-3 rounded-2xl bg-card/50">
-              <p className="text-xl font-bold">{profileStats.followers}</p>
-              <p className="text-xs text-muted-foreground">Followers</p>
-            </div>
-            <div className="p-3 rounded-2xl bg-card/50">
-              <p className="text-xl font-bold">{profileStats.following}</p>
-              <p className="text-xs text-muted-foreground">Following</p>
-            </div>
+            {user ? (
+              <FollowersSheet userId={user.id} type="followers" count={profileStats.followers}>
+                <button className="p-3 rounded-2xl bg-card/50 hover:bg-card/70 transition-colors w-full">
+                  <p className="text-xl font-bold">{profileStats.followers}</p>
+                  <p className="text-xs text-muted-foreground">Followers</p>
+                </button>
+              </FollowersSheet>
+            ) : (
+              <div className="p-3 rounded-2xl bg-card/50">
+                <p className="text-xl font-bold">{profileStats.followers}</p>
+                <p className="text-xs text-muted-foreground">Followers</p>
+              </div>
+            )}
+            {user ? (
+              <FollowersSheet userId={user.id} type="following" count={profileStats.following}>
+                <button className="p-3 rounded-2xl bg-card/50 hover:bg-card/70 transition-colors w-full">
+                  <p className="text-xl font-bold">{profileStats.following}</p>
+                  <p className="text-xs text-muted-foreground">Following</p>
+                </button>
+              </FollowersSheet>
+            ) : (
+              <div className="p-3 rounded-2xl bg-card/50">
+                <p className="text-xl font-bold">{profileStats.following}</p>
+                <p className="text-xs text-muted-foreground">Following</p>
+              </div>
+            )}
           </div>
         </div>
 

@@ -73,6 +73,7 @@ export function TrendingSection() {
       <SectionHeader
         title="Trending Now"
         subtitle="Hot tracks for you"
+        sectionKey="trending"
       />
       <HorizontalScroll>
         {trendingTracks.map((track, index) => (
