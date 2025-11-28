@@ -6,9 +6,12 @@ interface SectionHeaderProps {
   subtitle?: string;
   showAll?: boolean;
   href?: string;
+  sectionKey?: string;
 }
 
-export function SectionHeader({ title, subtitle, showAll = true, href = "#" }: SectionHeaderProps) {
+export function SectionHeader({ title, subtitle, showAll = true, href, sectionKey }: SectionHeaderProps) {
+  const linkHref = href || (sectionKey ? `/section/${sectionKey}` : "#");
+  
   return (
     <div className="flex items-end justify-between mb-4">
       <div>
@@ -19,7 +22,7 @@ export function SectionHeader({ title, subtitle, showAll = true, href = "#" }: S
       </div>
       {showAll && (
         <Link 
-          to={href}
+          to={linkHref}
           className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
         >
           See all

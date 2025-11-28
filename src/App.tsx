@@ -13,6 +13,7 @@ import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import Playlist from "./pages/Playlist";
 import LikedSongs from "./pages/LikedSongs";
+import SectionView from "./pages/SectionView";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
               <Route path="/auth" element={<Auth />} />
               <Route path="/playlist/:id" element={<Playlist />} />
               <Route path="/liked-songs" element={<LikedSongs />} />
+              <Route path="/section/:section" element={<SectionView />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

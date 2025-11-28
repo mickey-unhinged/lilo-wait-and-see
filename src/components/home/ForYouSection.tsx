@@ -80,7 +80,7 @@ export function ForYouSection() {
         <SectionHeader 
           title="✨ For You" 
           subtitle="Personalized picks based on your taste"
-          showAll={false}
+          sectionKey="for-you"
         />
         <div className="flex items-center justify-center h-48">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -98,7 +98,7 @@ export function ForYouSection() {
       <SectionHeader 
         title="✨ For You" 
         subtitle="Personalized picks based on your taste"
-        showAll={false}
+        sectionKey="for-you"
       />
       <HorizontalScroll>
         {tracks.map((track) => (
