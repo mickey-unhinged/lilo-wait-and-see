@@ -126,20 +126,48 @@ export default function ListeningRoom() {
         hasAutoPlayedRef.current = true;
         setIsSyncing(true);
         
-        // Play the track and seek to current position
+        // Calculate the actual current position based on time elapsed since last update
+        const lastUpdated = new Date(roomData.updated_at).getTime();
+        const now = Date.now();
+        const elapsedSeconds = (now - lastUpdated) / 1000;
+        const calculatedPosition = (roomWithTrack.playback_position || 0) + (roomWithTrack.is_playing ? elapsedSeconds : 0);
+        
+        // Play the track
         await playTrack(roomWithTrack.current_track);
         
-        // Wait a moment for audio to load, then seek to host's position
-        setTimeout(() => {
-          if (audioElement && roomWithTrack.playback_position > 0) {
-            audioElement.currentTime = roomWithTrack.playback_position;
+        // Wait for audio to load, then seek to calculated position
+        const seekToPosition = () => {
+          if (audioElement) {
+            // Ensure we don't seek past the duration
+            const seekPosition = Math.min(calculatedPosition, audioElement.duration || calculatedPosition);
+            if (seekPosition > 0) {
+              audioElement.currentTime = seekPosition;
+            }
+            if (!roomWithTrack.is_playing) {
+              pause();
+            }
+            setIsSyncing(false);
+            toast({ title: "📻 Tuned in!", description: `Now listening to ${roomWithTrack.name}` });
           }
-          if (!roomWithTrack.is_playing) {
-            pause();
+        };
+        
+        // Use loadedmetadata event for more reliable seeking
+        if (audioElement) {
+          if (audioElement.readyState >= 1) {
+            seekToPosition();
+          } else {
+            const handleLoaded = () => {
+              seekToPosition();
+              audioElement.removeEventListener('loadedmetadata', handleLoaded);
+            };
+            audioElement.addEventListener('loadedmetadata', handleLoaded);
+            // Fallback timeout in case event doesn't fire
+            setTimeout(() => {
+              seekToPosition();
+              audioElement.removeEventListener('loadedmetadata', handleLoaded);
+            }, 2000);
           }
-          setIsSyncing(false);
-          toast({ title: "📻 Tuned in!", description: `Now listening to ${roomWithTrack.name}` });
-        }, 500);
+        }
       }
 
       // Fetch participants
@@ -207,10 +235,29 @@ export default function ListeningRoom() {
             
             // Sync playback for non-hosts
             if (!isHost && newRoom.current_track) {
-              if (newRoom.is_playing) {
-                playTrack(newRoom.current_track as Track);
+              const currentTrackId = currentTrack?.id;
+              const newTrackId = (newRoom.current_track as Track)?.id;
+              
+              // Only change track if it's different
+              if (newTrackId !== currentTrackId) {
+                if (newRoom.is_playing) {
+                  playTrack(newRoom.current_track as Track);
+                  // Sync position after track loads
+                  setTimeout(() => {
+                    if (audioElement && newRoom.playback_position) {
+                      const lastUpdated = new Date(newRoom.updated_at).getTime();
+                      const elapsed = (Date.now() - lastUpdated) / 1000;
+                      audioElement.currentTime = newRoom.playback_position + elapsed;
+                    }
+                  }, 1000);
+                }
               } else {
-                pause();
+                // Same track, just sync play/pause state
+                if (newRoom.is_playing && audioElement?.paused) {
+                  play();
+                } else if (!newRoom.is_playing && !audioElement?.paused) {
+                  pause();
+                }
               }
             }
           }
@@ -290,19 +337,28 @@ export default function ListeningRoom() {
     if (!isHost || !id || !audioElement) return;
 
     const syncPosition = async () => {
-      const currentPosition = Math.floor(audioElement.currentTime);
-      await supabase
-        .from("listening_rooms")
-        .update({
-          playback_position: currentPosition,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", id);
+      if (!audioElement.paused && !audioElement.ended) {
+        const currentPosition = audioElement.currentTime;
+        await supabase
+          .from("listening_rooms")
+          .update({
+            playback_position: currentPosition,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id);
+      }
     };
 
-    // Sync position every 5 seconds
-    const interval = setInterval(syncPosition, 5000);
-    return () => clearInterval(interval);
+    // Sync position every 3 seconds for better accuracy
+    const interval = setInterval(syncPosition, 3000);
+    // Also sync immediately when position changes significantly (seeking)
+    const handleSeeked = () => syncPosition();
+    audioElement.addEventListener('seeked', handleSeeked);
+    
+    return () => {
+      clearInterval(interval);
+      audioElement.removeEventListener('seeked', handleSeeked);
+    };
   }, [isHost, id, audioElement]);
 
   const handleSendMessage = async () => {
