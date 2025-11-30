@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { 
   ArrowLeft, Users, Send, Music, Play, Pause, SkipForward, 
-  Crown, LogOut, Heart, Smile, ThumbsUp, Flame, Star, Lock
+  Crown, LogOut, Heart, Smile, ThumbsUp, Flame, Star, Lock, Radio
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,7 +53,7 @@ export default function ListeningRoom() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { currentTrack, isPlaying, play, pause, playTrack } = usePlayer();
+  const { currentTrack, isPlaying, play, pause, playTrack, audioElement, progress } = usePlayer();
   
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -62,9 +62,11 @@ export default function ListeningRoom() {
   const [userId, setUserId] = useState<string | null>(null);
   const [isHost, setIsHost] = useState(false);
   const [userProfile, setUserProfile] = useState<{ display_name: string; avatar_url: string } | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const hasAutoPlayedRef = useRef(false);
 
   // Check auth
   useEffect(() => {
@@ -87,7 +89,7 @@ export default function ListeningRoom() {
     });
   }, [navigate]);
 
-  // Fetch room data
+  // Fetch room data and auto-play for participants (radio-like behavior)
   useEffect(() => {
     if (!id || !userId) return;
 
@@ -104,17 +106,41 @@ export default function ListeningRoom() {
         return;
       }
 
-      setRoom({
+      const roomWithTrack = {
         ...roomData,
         current_track: roomData.current_track as unknown as Track | null,
-      });
-      setIsHost(roomData.host_id === userId);
+      };
+      
+      setRoom(roomWithTrack);
+      const userIsHost = roomData.host_id === userId;
+      setIsHost(userIsHost);
 
       // Join room
       await supabase.from("room_participants").upsert({
         room_id: id,
         user_id: userId,
       });
+
+      // Auto-play for participants (radio-like behavior)
+      if (!userIsHost && roomWithTrack.current_track && !hasAutoPlayedRef.current) {
+        hasAutoPlayedRef.current = true;
+        setIsSyncing(true);
+        
+        // Play the track and seek to current position
+        await playTrack(roomWithTrack.current_track);
+        
+        // Wait a moment for audio to load, then seek to host's position
+        setTimeout(() => {
+          if (audioElement && roomWithTrack.playback_position > 0) {
+            audioElement.currentTime = roomWithTrack.playback_position;
+          }
+          if (!roomWithTrack.is_playing) {
+            pause();
+          }
+          setIsSyncing(false);
+          toast({ title: "📻 Tuned in!", description: `Now listening to ${roomWithTrack.name}` });
+        }, 500);
+      }
 
       // Fetch participants
       const { data: participantsData } = await supabase
@@ -123,7 +149,6 @@ export default function ListeningRoom() {
         .eq("room_id", id);
 
       if (participantsData) {
-        // Fetch profiles for participants
         const userIds = participantsData.map(p => p.user_id);
         const { data: profiles } = await supabase
           .from("profiles")
@@ -161,7 +186,7 @@ export default function ListeningRoom() {
     };
 
     fetchRoom();
-  }, [id, userId, navigate, toast]);
+  }, [id, userId, navigate, toast, playTrack, pause, audioElement]);
 
   // Subscribe to realtime updates
   useEffect(() => {
@@ -242,7 +267,7 @@ export default function ListeningRoom() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Sync host's playback to room
+  // Sync host's playback to room (including position for radio sync)
   useEffect(() => {
     if (!isHost || !id || !room) return;
 
@@ -259,6 +284,26 @@ export default function ListeningRoom() {
 
     syncPlayback();
   }, [currentTrack, isPlaying, isHost, id, room]);
+
+  // Host: Periodically sync playback position for radio-like sync
+  useEffect(() => {
+    if (!isHost || !id || !audioElement) return;
+
+    const syncPosition = async () => {
+      const currentPosition = Math.floor(audioElement.currentTime);
+      await supabase
+        .from("listening_rooms")
+        .update({
+          playback_position: currentPosition,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+    };
+
+    // Sync position every 5 seconds
+    const interval = setInterval(syncPosition, 5000);
+    return () => clearInterval(interval);
+  }, [isHost, id, audioElement]);
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !userId || !id) return;
@@ -329,14 +374,45 @@ export default function ListeningRoom() {
 
       {/* Now Playing */}
       <div className="px-4 py-6 bg-gradient-to-b from-primary/10 to-transparent">
+        {/* Radio indicator for participants */}
+        {!isHost && room.current_track && (
+          <div className="flex items-center gap-2 mb-3 text-xs">
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/20 text-primary">
+              <Radio className="w-3 h-3 animate-pulse" />
+              <span>Live Radio</span>
+            </div>
+            {isSyncing && (
+              <span className="text-muted-foreground animate-pulse">Syncing...</span>
+            )}
+          </div>
+        )}
+        
         <div className="flex items-center gap-4">
-          <div className="w-20 h-20 rounded-xl overflow-hidden bg-card">
+          <div className="w-20 h-20 rounded-xl overflow-hidden bg-card relative">
             {room.current_track ? (
-              <img
-                src={room.current_track.cover_url || room.current_track.album_cover}
-                alt={room.current_track.title}
-                className="w-full h-full object-cover"
-              />
+              <>
+                <img
+                  src={room.current_track.cover_url || room.current_track.album_cover}
+                  alt={room.current_track.title}
+                  className="w-full h-full object-cover"
+                />
+                {room.is_playing && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3].map((i) => (
+                        <div
+                          key={i}
+                          className="w-1 bg-primary rounded-full animate-pulse"
+                          style={{
+                            height: `${12 + Math.random() * 8}px`,
+                            animationDelay: `${i * 0.15}s`,
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <Music className="w-8 h-8 text-muted-foreground" />
@@ -350,7 +426,7 @@ export default function ListeningRoom() {
             <p className="text-sm text-muted-foreground truncate">
               {room.current_track?.artist_name || "Waiting for host..."}
             </p>
-            {isHost && (
+            {isHost ? (
               <div className="flex flex-col gap-2 mt-2">
                 <div className="flex items-center gap-2">
                   <Button
@@ -373,7 +449,7 @@ export default function ListeningRoom() {
                   )}
                 </div>
                 <span className="text-xs text-primary flex items-center gap-1">
-                  <Crown className="w-3 h-3" /> Host controls
+                  <Crown className="w-3 h-3" /> You're the DJ
                   {room.is_private && (
                     <span className="ml-2 flex items-center gap-1 text-muted-foreground">
                       <Lock className="w-3 h-3" /> Private Room
@@ -381,6 +457,10 @@ export default function ListeningRoom() {
                   )}
                 </span>
               </div>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-2">
+                🎧 Listening along with {participants.length} others
+              </p>
             )}
           </div>
         </div>
