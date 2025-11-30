@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { Users, Loader2, BarChart3 } from "lucide-react";
+import { Users, Loader2, BarChart3, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
 import { FriendStatsSheet } from "@/components/profile/FriendStatsSheet";
+import { Link } from "react-router-dom";
 
 interface Activity {
   user_id: string;
@@ -178,7 +179,16 @@ export function FriendsActivity() {
 
   return (
     <div className="py-4">
-      <h2 className="text-xl font-bold font-display mb-4 px-4">Friends Activity</h2>
+      <div className="flex items-center justify-between mb-4 px-4">
+        <h2 className="text-xl font-bold font-display">Friends Activity</h2>
+        <Link 
+          to="/friends"
+          className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          See all
+          <ChevronRight className="w-4 h-4" />
+        </Link>
+      </div>
       <div className="space-y-3 px-4">
         {activities.map((activity, index) => (
           <FriendStatsSheet key={`${activity.user_id}-${activity.played_at}-${index}`} friendId={activity.user_id}>

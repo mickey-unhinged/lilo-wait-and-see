@@ -16,6 +16,7 @@ import LikedSongs from "./pages/LikedSongs";
 import SectionView from "./pages/SectionView";
 import Artist from "./pages/Artist";
 import Downloads from "./pages/Downloads";
+import Friends from "./pages/Friends";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
               <Route path="/playlist/:id" element={<Playlist />} />
               <Route path="/liked-songs" element={<LikedSongs />} />
               <Route path="/downloads" element={<Downloads />} />
+              <Route path="/friends" element={<Friends />} />
               <Route path="/section/:section" element={<SectionView />} />
               <Route path="/artist/:slug" element={<Artist />} />
               <Route path="*" element={<NotFound />} />

@@ -8,6 +8,7 @@ import { TrendingSection } from "@/components/home/TrendingSection";
 import { TopArtistsSection } from "@/components/home/TopArtistsSection";
 import { Watermark } from "@/components/common/Watermark";
 import { FriendsActivity } from "@/components/home/FriendsActivity";
+import { CuratedPlaylistsSection } from "@/components/home/CuratedPlaylistsSection";
 
 const Index = () => {
   return (
@@ -15,6 +16,7 @@ const Index = () => {
       <HeroSection />
       <QuickAccessGrid />
       <RecentlyPlayedSection />
+      <CuratedPlaylistsSection />
       <ForYouSection />
       <DailyMixSection />
       <FriendsActivity />

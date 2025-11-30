@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { AddSongsToPlaylist } from "@/components/playlist/AddSongsToPlaylist";
 import { PlaylistCoverUpload } from "@/components/playlist/PlaylistCoverUpload";
 import { getPlaylistStreamTracks, onPlaylistStreamsUpdated } from "@/lib/playlistStreams";
+import { PlaylistDownloadButton } from "@/components/playlist/PlaylistDownloadButton";
 
 const formatDuration = (ms: number) => {
   const minutes = Math.floor(ms / 60000);
@@ -249,6 +250,14 @@ const Playlist = () => {
             <button className="p-3 rounded-full bg-card/50 hover:bg-card transition-colors">
               <Shuffle className="w-6 h-6" />
             </button>
+          </div>
+
+          {/* Download all button */}
+          <div className="flex justify-center mt-4">
+            <PlaylistDownloadButton 
+              tracks={tracks} 
+              playlistName={playlistInfo?.title || "Playlist"} 
+            />
           </div>
 
           {/* Collaborative controls */}

@@ -7,15 +7,19 @@ interface SectionHeaderProps {
   showAll?: boolean;
   href?: string;
   sectionKey?: string;
+  icon?: React.ReactNode;
 }
 
-export function SectionHeader({ title, subtitle, showAll = true, href, sectionKey }: SectionHeaderProps) {
+export function SectionHeader({ title, subtitle, showAll = true, href, sectionKey, icon }: SectionHeaderProps) {
   const linkHref = href || (sectionKey ? `/section/${sectionKey}` : "#");
   
   return (
     <div className="flex items-end justify-between mb-4">
       <div>
-        <h2 className="text-xl font-bold font-display">{title}</h2>
+        <div className="flex items-center gap-2">
+          {icon}
+          <h2 className="text-xl font-bold font-display">{title}</h2>
+        </div>
         {subtitle && (
           <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>
         )}
