@@ -713,6 +713,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_room: {
+        Args: { _room_id: string; _user_id: string }
+        Returns: boolean
+      }
       generate_room_code: { Args: never; Returns: string }
       has_role: {
         Args: {

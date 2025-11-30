@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePlayer, Track } from "@/contexts/PlayerContext";
 import { SectionHeader } from "./SectionHeader";
 import { HorizontalScroll } from "./HorizontalScroll";
@@ -11,19 +11,19 @@ export function ForYouSection() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { playTrack, setQueue } = usePlayer();
+  const sessionSeed = useRef(Math.floor(Math.random() * 1000) + 100);
 
   useEffect(() => {
     fetchPersonalizedTracks();
-    
-    // Refresh every 30 minutes for variety
-    const interval = setInterval(fetchPersonalizedTracks, 30 * 60 * 1000);
+
+    // Refresh every 12 minutes for variety
+    const interval = setInterval(fetchPersonalizedTracks, 12 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
   const fetchPersonalizedTracks = async () => {
     setIsLoading(true);
     try {
-      // Get user's play history
       const stored = localStorage.getItem("lilo-play-history");
       let seedArtists: string[] = [];
 
@@ -36,15 +36,13 @@ export function ForYouSection() {
             artistCounts[artist] = (artistCounts[artist] || 0) + 1;
           }
         });
-        
-        // Get top 4 artists
+
         seedArtists = Object.entries(artistCounts)
           .sort(([, a], [, b]) => b - a)
           .slice(0, 4)
           .map(([artist]) => artist);
       }
 
-      // Get search history keywords
       const searchTerms = extractKeywordsFromHistory();
 
       const { data, error } = await supabase.functions.invoke("trending-suggestions", {
@@ -52,6 +50,7 @@ export function ForYouSection() {
           type: "personalized",
           seedArtists,
           searchTerms,
+          sectionOffset: sessionSeed.current,
           limit: 12,
         },
       });
@@ -77,8 +76,8 @@ export function ForYouSection() {
   if (isLoading) {
     return (
       <section className="mb-8">
-        <SectionHeader 
-          title="✨ For You" 
+        <SectionHeader
+          title="✨ For You"
           subtitle="Personalized picks based on your taste"
           sectionKey="for-you"
         />
@@ -95,8 +94,8 @@ export function ForYouSection() {
 
   return (
     <section className="mb-8">
-      <SectionHeader 
-        title="✨ For You" 
+      <SectionHeader
+        title="✨ For You"
         subtitle="Personalized picks based on your taste"
         sectionKey="for-you"
       />
