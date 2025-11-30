@@ -64,7 +64,8 @@ export default function ListeningRoom() {
   const [userProfile, setUserProfile] = useState<{ display_name: string; avatar_url: string } | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isBehind, setIsBehind] = useState(false);
-  const [needsUserGesture, setNeedsUserGesture] = useState(false);
+  const [needsUserGesture, setNeedsUserGesture] = useState(true); // Default true until audio plays
+  const [hasJoinedPlayback, setHasJoinedPlayback] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -130,73 +131,13 @@ export default function ListeningRoom() {
         updatedAt: new Date(roomData.updated_at).getTime(),
       };
       
-      // Auto-play for participants (radio-like behavior)
-      if (!userIsHost && roomWithTrack.current_track && !hasAutoPlayedRef.current) {
-        hasAutoPlayedRef.current = true;
-        setIsSyncing(true);
-        
-        // Calculate the actual current position based on time elapsed since last update
-        const lastUpdated = new Date(roomData.updated_at).getTime();
-        const now = Date.now();
-        const elapsedSeconds = (now - lastUpdated) / 1000;
-        const calculatedPosition = (roomWithTrack.playback_position || 0) + (roomWithTrack.is_playing ? elapsedSeconds : 0);
-        
-        try {
-          // Play the track
-          await playTrack(roomWithTrack.current_track);
-          
-          // Wait for audio to load, then seek to calculated position and start playing
-          const seekAndPlay = async () => {
-            if (audioElement) {
-              // Ensure we don't seek past the duration
-              const seekPosition = Math.min(calculatedPosition, audioElement.duration || calculatedPosition);
-              if (seekPosition > 0) {
-                audioElement.currentTime = seekPosition;
-              }
-              
-              // Try to play - might fail due to autoplay restrictions
-              if (roomWithTrack.is_playing) {
-                try {
-                  await audioElement.play();
-                  setNeedsUserGesture(false);
-                  toast({ title: "📻 Tuned in!", description: `Now listening to ${roomWithTrack.name}` });
-                } catch (playError) {
-                  console.log("Autoplay blocked, needs user gesture:", playError);
-                  setNeedsUserGesture(true);
-                  toast({ 
-                    title: "Tap to start listening", 
-                    description: "Browser requires interaction to play audio"
-                  });
-                }
-              } else {
-                pause();
-              }
-              setIsSyncing(false);
-            }
-          };
-          
-          // Use loadedmetadata event for more reliable seeking
-          if (audioElement) {
-            if (audioElement.readyState >= 1) {
-              await seekAndPlay();
-            } else {
-              const handleLoaded = async () => {
-                await seekAndPlay();
-                audioElement.removeEventListener('loadedmetadata', handleLoaded);
-              };
-              audioElement.addEventListener('loadedmetadata', handleLoaded);
-              // Fallback timeout in case event doesn't fire
-              setTimeout(async () => {
-                await seekAndPlay();
-                audioElement.removeEventListener('loadedmetadata', handleLoaded);
-              }, 2000);
-            }
-          }
-        } catch (err) {
-          console.error("Failed to auto-play:", err);
-          setNeedsUserGesture(true);
-          setIsSyncing(false);
-        }
+      // For participants: set up state but don't auto-play (requires user gesture)
+      if (!userIsHost && roomWithTrack.current_track) {
+        setNeedsUserGesture(true);
+        setHasJoinedPlayback(false);
+      } else if (userIsHost) {
+        setNeedsUserGesture(false);
+        setHasJoinedPlayback(true);
       }
 
       // Fetch participants
@@ -270,10 +211,11 @@ export default function ListeningRoom() {
               };
             }
             
-            // Sync playback for non-hosts
-            if (!isHost && newRoom.current_track) {
+            // Sync playback for non-hosts who have joined
+            if (!isHost && newRoom.current_track && hasJoinedPlayback) {
               const currentTrackId = currentTrack?.id;
               const newTrackId = (newRoom.current_track as Track)?.id;
+              const audio = document.querySelector('audio') as HTMLAudioElement;
               
               // Only change track if it's different
               if (newTrackId !== currentTrackId) {
@@ -281,18 +223,19 @@ export default function ListeningRoom() {
                   playTrack(newRoom.current_track as Track);
                   // Sync position after track loads
                   setTimeout(() => {
-                    if (audioElement && newRoom.playback_position) {
+                    const audio = document.querySelector('audio') as HTMLAudioElement;
+                    if (audio && newRoom.playback_position) {
                       const lastUpdated = new Date(newRoom.updated_at).getTime();
                       const elapsed = (Date.now() - lastUpdated) / 1000;
-                      audioElement.currentTime = newRoom.playback_position + elapsed;
+                      audio.currentTime = newRoom.playback_position + elapsed;
                     }
                   }, 1000);
                 }
-              } else {
+              } else if (audio) {
                 // Same track, just sync play/pause state
-                if (newRoom.is_playing && audioElement?.paused) {
-                  audioElement.play().catch(() => setNeedsUserGesture(true));
-                } else if (!newRoom.is_playing && !audioElement?.paused) {
+                if (newRoom.is_playing && audio.paused) {
+                  audio.play().catch(() => {});
+                } else if (!newRoom.is_playing && !audio.paused) {
                   pause();
                 }
               }
@@ -344,7 +287,7 @@ export default function ListeningRoom() {
     return () => {
       supabase.removeChannel(roomChannel);
     };
-  }, [id, isHost, playTrack, pause]);
+  }, [id, isHost, playTrack, pause, hasJoinedPlayback, currentTrack]);
 
   // Scroll to bottom of messages
   useEffect(() => {
@@ -400,15 +343,18 @@ export default function ListeningRoom() {
 
   // Check if participant is behind the host
   useEffect(() => {
-    if (isHost || !audioElement || !lastKnownHostPositionRef.current) return;
+    if (isHost || !hasJoinedPlayback || !lastKnownHostPositionRef.current) return;
     
     const checkIfBehind = () => {
       if (!lastKnownHostPositionRef.current) return;
       
+      const audio = document.querySelector('audio') as HTMLAudioElement;
+      if (!audio) return;
+      
       const hostRef = lastKnownHostPositionRef.current;
       const elapsed = (Date.now() - hostRef.updatedAt) / 1000;
       const estimatedHostPosition = hostRef.position + elapsed;
-      const myPosition = audioElement.currentTime;
+      const myPosition = audio.currentTime;
       
       // Consider "behind" if more than 5 seconds off
       setIsBehind(Math.abs(estimatedHostPosition - myPosition) > 5);
@@ -416,62 +362,104 @@ export default function ListeningRoom() {
     
     const interval = setInterval(checkIfBehind, 2000);
     return () => clearInterval(interval);
-  }, [isHost, audioElement]);
+  }, [isHost, hasJoinedPlayback]);
 
   // Catch up to host's current position
   const handleCatchUp = useCallback(async () => {
-    if (!audioElement || !lastKnownHostPositionRef.current || !room?.current_track) return;
+    if (!lastKnownHostPositionRef.current || !room?.current_track) return;
     
     setIsSyncing(true);
+    
+    // Get fresh reference to audio element
+    const audio = document.querySelector('audio') as HTMLAudioElement;
+    if (!audio) {
+      setIsSyncing(false);
+      return;
+    }
+    
     const hostRef = lastKnownHostPositionRef.current;
     const elapsed = (Date.now() - hostRef.updatedAt) / 1000;
     const estimatedHostPosition = hostRef.position + (room.is_playing ? elapsed : 0);
+    const safePosition = Math.min(estimatedHostPosition, audio.duration || estimatedHostPosition);
     
-    audioElement.currentTime = estimatedHostPosition;
+    audio.currentTime = safePosition;
     
-    if (room.is_playing && audioElement.paused) {
+    if (room.is_playing && audio.paused) {
       try {
-        await audioElement.play();
-        setNeedsUserGesture(false);
-      } catch {
-        setNeedsUserGesture(true);
+        await audio.play();
+      } catch (err) {
+        console.error("Failed to play on catch up:", err);
       }
     }
     
     setIsSyncing(false);
     setIsBehind(false);
     toast({ title: "Synced!", description: "You're now in sync with the host" });
-  }, [audioElement, room, toast]);
+  }, [room, toast]);
 
   // Start playing for first time (when user gesture is required)
   const handleStartListening = useCallback(async () => {
-    if (!audioElement || !room?.current_track) return;
+    if (!room?.current_track) return;
     
     setIsSyncing(true);
     
-    // First ensure we have the track loaded
-    if (!currentTrack || currentTrack.id !== room.current_track.id) {
-      await playTrack(room.current_track);
-    }
-    
-    // Calculate current host position
-    if (lastKnownHostPositionRef.current) {
-      const hostRef = lastKnownHostPositionRef.current;
-      const elapsed = (Date.now() - hostRef.updatedAt) / 1000;
-      const estimatedHostPosition = hostRef.position + (room.is_playing ? elapsed : 0);
-      audioElement.currentTime = estimatedHostPosition;
-    }
-    
     try {
-      await audioElement.play();
+      // First load and play the track
+      await playTrack(room.current_track);
+      
+      // Wait a bit for audio element to be ready
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Get fresh reference to audio element
+      const audio = document.querySelector('audio') as HTMLAudioElement;
+      if (!audio) {
+        console.error("No audio element found");
+        setIsSyncing(false);
+        return;
+      }
+      
+      // Wait for audio to be ready
+      const waitForAudio = () => new Promise<void>((resolve) => {
+        if (audio.readyState >= 2) {
+          resolve();
+        } else {
+          const handler = () => {
+            audio.removeEventListener('canplay', handler);
+            resolve();
+          };
+          audio.addEventListener('canplay', handler);
+          // Timeout fallback
+          setTimeout(resolve, 2000);
+        }
+      });
+      
+      await waitForAudio();
+      
+      // Calculate and seek to current host position
+      if (lastKnownHostPositionRef.current) {
+        const hostRef = lastKnownHostPositionRef.current;
+        const elapsed = (Date.now() - hostRef.updatedAt) / 1000;
+        const estimatedHostPosition = hostRef.position + (room.is_playing ? elapsed : 0);
+        const safePosition = Math.min(estimatedHostPosition, audio.duration || estimatedHostPosition);
+        audio.currentTime = safePosition;
+        console.log(`Seeking to position: ${safePosition}s`);
+      }
+      
+      // Ensure audio is playing
+      if (audio.paused && room.is_playing) {
+        await audio.play();
+      }
+      
       setNeedsUserGesture(false);
+      setHasJoinedPlayback(true);
       toast({ title: "📻 Tuned in!", description: `Now listening to ${room.name}` });
     } catch (err) {
       console.error("Failed to play:", err);
+      toast({ title: "Failed to play", description: "Please try again", variant: "destructive" });
     }
     
     setIsSyncing(false);
-  }, [audioElement, room, currentTrack, playTrack, toast]);
+  }, [room, playTrack, toast]);
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !userId || !id) return;
@@ -627,12 +615,12 @@ export default function ListeningRoom() {
               </div>
             ) : (
               <div className="mt-2 space-y-2">
-                {/* Tap to start listening button (when autoplay blocked) */}
-                {needsUserGesture && room.current_track && (
+                {/* Tap to start listening button - always show for participants who haven't joined */}
+                {room.current_track && !hasJoinedPlayback && (
                   <Button 
                     size="sm" 
                     onClick={handleStartListening}
-                    className="w-full"
+                    className="w-full bg-primary hover:bg-primary/90"
                     disabled={isSyncing}
                   >
                     <Play className="w-4 h-4 mr-2" />
@@ -640,23 +628,29 @@ export default function ListeningRoom() {
                   </Button>
                 )}
                 
-                {/* Catch up button (when behind the host) */}
-                {!needsUserGesture && isBehind && (
+                {/* Catch up button (when behind the host and already listening) */}
+                {hasJoinedPlayback && isBehind && (
                   <Button 
                     size="sm" 
                     variant="secondary"
                     onClick={handleCatchUp}
                     disabled={isSyncing}
-                    className="gap-2"
+                    className="gap-2 w-full"
                   >
                     <RefreshCw className={cn("w-4 h-4", isSyncing && "animate-spin")} />
-                    Catch Up
+                    Catch Up to Host
                   </Button>
                 )}
                 
-                <p className="text-xs text-muted-foreground">
-                  🎧 Listening along with {participants.length} others
-                </p>
+                {hasJoinedPlayback ? (
+                  <p className="text-xs text-muted-foreground">
+                    🎧 Listening along with {participants.length} others
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Tap the button above to join the live session
+                  </p>
+                )}
               </div>
             )}
           </div>
