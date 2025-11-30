@@ -37,21 +37,37 @@ const moods = [
   { id: "6", name: "Party", emoji: "🎉", color: "from-fuchsia-500 to-pink-500" },
 ];
 
-const trendingSearches = [
-  "Taylor Swift",
-  "Drake",
-  "The Weeknd",
-  "Bad Bunny",
-  "Morgan Wallen",
-  "SZA",
-];
+// Dynamic trending searches that rotate based on time
+const getTrendingSearches = () => {
+  const allTrending = [
+    ["Taylor Swift", "Drake", "The Weeknd", "Bad Bunny", "Morgan Wallen", "SZA"],
+    ["Beyoncé", "Kendrick Lamar", "Doja Cat", "Post Malone", "Dua Lipa", "Ed Sheeran"],
+    ["Billie Eilish", "Harry Styles", "Olivia Rodrigo", "Travis Scott", "Ariana Grande", "Justin Bieber"],
+    ["Rihanna", "Bruno Mars", "Cardi B", "Lil Baby", "21 Savage", "Future"],
+    ["Miley Cyrus", "Lizzo", "Jack Harlow", "Ice Spice", "Metro Boomin", "Tyler, The Creator"],
+    ["BTS", "BLACKPINK", "NewJeans", "Stray Kids", "Seventeen", "aespa"],
+  ];
+  
+  // Rotate every 2 hours
+  const rotationIndex = Math.floor(Date.now() / (1000 * 60 * 120)) % allTrending.length;
+  return allTrending[rotationIndex];
+};
 
 const Search = () => {
   const [query, setQuery] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [searchSource, setSearchSource] = useState<SearchSource>("live");
+  const [trendingSearches, setTrendingSearches] = useState<string[]>(getTrendingSearches());
   const debouncedQuery = useDebounce(query, 400);
   const { addToHistory } = useSearchHistory();
+  
+  // Update trending searches periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTrendingSearches(getTrendingSearches());
+    }, 60 * 1000); // Check every minute
+    return () => clearInterval(interval);
+  }, []);
   
   const liveVideo = useLiveVideoSearch();
   const iTunes = useMusicSearch();

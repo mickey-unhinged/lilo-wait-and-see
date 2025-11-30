@@ -29,10 +29,11 @@ const MOOD_QUERIES: Record<string, string[]> = {
 // Use Invidious API as primary source (more reliable)
 async function fetchFromInvidious(): Promise<Track[]> {
   const instances = [
-    "https://invidious.fdn.fr",
+    "https://vid.puffyan.us",
+    "https://invidious.snopyta.org",
+    "https://yewtu.be",
     "https://inv.nadeko.net",
     "https://invidious.nerdvpn.de",
-    "https://yt.artemislena.eu",
   ];
 
   for (const instance of instances) {
@@ -43,7 +44,7 @@ async function fetchFromInvidious(): Promise<Track[]> {
           "User-Agent": "Lilo/1.0",
           "Accept": "application/json",
         },
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(6000),
       });
 
       if (!response.ok) {
@@ -84,7 +85,8 @@ async function fetchFromInvidious(): Promise<Track[]> {
 // Search using Invidious
 async function searchInvidious(query: string): Promise<Track[]> {
   const instances = [
-    "https://invidious.fdn.fr",
+    "https://vid.puffyan.us",
+    "https://yewtu.be",
     "https://inv.nadeko.net",
     "https://invidious.nerdvpn.de",
   ];
@@ -98,7 +100,7 @@ async function searchInvidious(query: string): Promise<Track[]> {
             "User-Agent": "Lilo/1.0",
             "Accept": "application/json",
           },
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(6000),
         }
       );
 
@@ -132,8 +134,8 @@ async function searchInvidious(query: string): Promise<Track[]> {
   return [];
 }
 
-// Fallback: curated list of popular songs by mood
-function getFallbackTracks(mood?: string): Track[] {
+// Expanded fallback list with more variety - rotates based on time
+function getFallbackTracks(mood?: string, seed?: number): Track[] {
   const moodTracks: Record<string, Array<{ title: string; artist: string; videoId: string }>> = {
     chill: [
       { title: "Sunflower", artist: "Post Malone & Swae Lee", videoId: "ApXoWvfEYVU" },
@@ -168,7 +170,7 @@ function getFallbackTracks(mood?: string): Track[] {
       { title: "Eye of the Tiger", artist: "Survivor", videoId: "btPJPFnesV4" },
       { title: "Lose Yourself", artist: "Eminem", videoId: "_Yhyp-_hX2s" },
       { title: "Till I Collapse", artist: "Eminem", videoId: "ytQ5CYE1VZw" },
-      { title: "Run the World", artist: "Beyoncé", videoId: "VBmMU_T_mt" },
+      { title: "Power", artist: "Kanye West", videoId: "L53gjP-TtGE" },
     ],
     sleep: [
       { title: "Weightless", artist: "Marconi Union", videoId: "UfcAVejslrU" },
@@ -179,27 +181,87 @@ function getFallbackTracks(mood?: string): Track[] {
     ],
   };
 
-  const popularSongs = [
+  // Extended list of popular songs - rotates based on time seed
+  const allPopularSongs = [
+    // Group 1 - Current Hits
     { title: "Blinding Lights", artist: "The Weeknd", videoId: "4NRXx6U8ABQ" },
     { title: "Shape of You", artist: "Ed Sheeran", videoId: "JGwWNGJdvx8" },
     { title: "Dance Monkey", artist: "Tones and I", videoId: "q0hyYWKXF0Q" },
     { title: "Someone You Loved", artist: "Lewis Capaldi", videoId: "zABLecsR5UE" },
     { title: "Watermelon Sugar", artist: "Harry Styles", videoId: "E07s5ZYygMg" },
+    // Group 2 - Pop Hits
     { title: "Don't Start Now", artist: "Dua Lipa", videoId: "oygrmJFKYZY" },
     { title: "Levitating", artist: "Dua Lipa", videoId: "TUVcZfQe-Kw" },
     { title: "Stay", artist: "The Kid LAROI & Justin Bieber", videoId: "kTJczUoc26U" },
     { title: "Heat Waves", artist: "Glass Animals", videoId: "mRD0-GxqHVo" },
     { title: "As It Was", artist: "Harry Styles", videoId: "H5v3kku4y6Q" },
+    // Group 3 - 2023-2024 Hits
     { title: "Anti-Hero", artist: "Taylor Swift", videoId: "b1kbLwvqugk" },
     { title: "Flowers", artist: "Miley Cyrus", videoId: "G7KNmW9a75Y" },
     { title: "Kill Bill", artist: "SZA", videoId: "hTGdWMlPPRc" },
     { title: "Unholy", artist: "Sam Smith & Kim Petras", videoId: "Uq9gPaIzbe8" },
     { title: "Calm Down", artist: "Rema & Selena Gomez", videoId: "CQLsdm1ZYAw" },
+    // Group 4 - Classics
+    { title: "Bohemian Rhapsody", artist: "Queen", videoId: "fJ9rUzIMcZQ" },
+    { title: "Sweet Child O' Mine", artist: "Guns N' Roses", videoId: "1w7OgIMMRc4" },
+    { title: "Billie Jean", artist: "Michael Jackson", videoId: "Zi_XLOBDo_Y" },
+    { title: "Take On Me", artist: "a-ha", videoId: "djV11Xbc914" },
+    { title: "Africa", artist: "Toto", videoId: "FTQbiNvZqaY" },
+    // Group 5 - Hip-Hop/R&B
+    { title: "God's Plan", artist: "Drake", videoId: "xpVfcZ0ZcFM" },
+    { title: "HUMBLE.", artist: "Kendrick Lamar", videoId: "tvTRZJ-4EyI" },
+    { title: "Old Town Road", artist: "Lil Nas X", videoId: "w2Ov5jzm3j8" },
+    { title: "Sicko Mode", artist: "Travis Scott", videoId: "6ONRf7h3Mdk" },
+    { title: "Bad Guy", artist: "Billie Eilish", videoId: "DyDfgMOUjCI" },
+    // Group 6 - Latin/International
+    { title: "Despacito", artist: "Luis Fonsi ft. Daddy Yankee", videoId: "kJQP7kiw5Fk" },
+    { title: "Tití Me Preguntó", artist: "Bad Bunny", videoId: "iaGobs5i1qw" },
+    { title: "Dákiti", artist: "Bad Bunny & Jhay Cortez", videoId: "TmKh7lAwnBI" },
+    { title: "Butter", artist: "BTS", videoId: "WMweEpGlu_U" },
+    { title: "Pink Venom", artist: "BLACKPINK", videoId: "gQlMMD8auMs" },
+    // Group 7 - Alternative/Indie
+    { title: "Sweater Weather", artist: "The Neighbourhood", videoId: "GCdwKhTtNNw" },
+    { title: "Mr. Brightside", artist: "The Killers", videoId: "gGdGFtwCNBE" },
+    { title: "Radioactive", artist: "Imagine Dragons", videoId: "ktvTqknDobU" },
+    { title: "Stressed Out", artist: "Twenty One Pilots", videoId: "pXRviuL6vMY" },
+    { title: "Believer", artist: "Imagine Dragons", videoId: "7wtfhZwyrcc" },
+    // Group 8 - Recent Releases
+    { title: "Vampire", artist: "Olivia Rodrigo", videoId: "RlPNh_PBZb4" },
+    { title: "Cruel Summer", artist: "Taylor Swift", videoId: "ic8j13piAhQ" },
+    { title: "Last Night", artist: "Morgan Wallen", videoId: "BnlYN-cFZmg" },
+    { title: "Snooze", artist: "SZA", videoId: "LwE6LxqGKmo" },
+    { title: "Creepin'", artist: "Metro Boomin, The Weeknd & 21 Savage", videoId: "6FWUjJF1ai0" },
   ];
 
-  const songs = mood && moodTracks[mood] ? moodTracks[mood] : popularSongs;
+  if (mood && moodTracks[mood]) {
+    const songs = moodTracks[mood];
+    return songs.map((song) => ({
+      id: `ytm-${song.videoId}`,
+      title: song.title,
+      artist_id: song.videoId,
+      artist_name: song.artist,
+      cover_url: `https://i.ytimg.com/vi/${song.videoId}/hqdefault.jpg`,
+      duration_ms: 200000,
+      videoId: song.videoId,
+    }));
+  }
 
-  return songs.map((song) => ({
+  // Use seed to determine which group to prioritize
+  const effectiveSeed = seed || Math.floor(Date.now() / (1000 * 60 * 30)); // Changes every 30 mins
+  const groupSize = 5;
+  const numGroups = Math.ceil(allPopularSongs.length / groupSize);
+  const startGroup = effectiveSeed % numGroups;
+  
+  // Rotate songs based on seed - prioritize different groups at different times
+  const rotatedSongs: typeof allPopularSongs = [];
+  for (let i = 0; i < numGroups; i++) {
+    const groupIndex = (startGroup + i) % numGroups;
+    const start = groupIndex * groupSize;
+    const end = Math.min(start + groupSize, allPopularSongs.length);
+    rotatedSongs.push(...allPopularSongs.slice(start, end));
+  }
+
+  return rotatedSongs.map((song) => ({
     id: `ytm-${song.videoId}`,
     title: song.title,
     artist_id: song.videoId,
@@ -244,6 +306,7 @@ serve(async (req) => {
 
     let tracks: Track[] = [];
     const hourSeed = Math.floor(Date.now() / (1000 * 60 * 60)); // Changes every hour
+    const halfHourSeed = Math.floor(Date.now() / (1000 * 60 * 30)); // Changes every 30 mins
 
     if (type === "autoplay" && seedArtists?.length > 0) {
       // Autoplay: fetch similar tracks based on current artist
@@ -276,7 +339,7 @@ serve(async (req) => {
       
       // Add fallback if not enough
       if (tracks.length < 5) {
-        const fallback = getFallbackTracks();
+        const fallback = getFallbackTracks(undefined, halfHourSeed);
         for (const t of fallback) {
           if (!seen.has(t.id)) {
             tracks.push(t);
@@ -319,7 +382,7 @@ serve(async (req) => {
       
       // Add fallback if not enough
       if (tracks.length < limit / 2) {
-        const fallback = getFallbackTracks();
+        const fallback = getFallbackTracks(undefined, weeklySeed);
         for (const t of seededShuffle(fallback, weeklySeed)) {
           if (!seen.has(t.id)) {
             tracks.push(t);
@@ -359,7 +422,7 @@ serve(async (req) => {
       
       // Add fallback if not enough tracks
       if (tracks.length < limit / 2) {
-        const fallback = getFallbackTracks(mood);
+        const fallback = getFallbackTracks(mood, halfHourSeed);
         for (const t of fallback) {
           if (!seen.has(t.id)) {
             tracks.push(t);
@@ -406,7 +469,7 @@ serve(async (req) => {
       // If not enough personalized results, add some trending/fallback
       if (tracks.length < limit / 2) {
         const trending = await fetchFromInvidious();
-        const fallback = trending.length > 0 ? trending : getFallbackTracks();
+        const fallback = trending.length > 0 ? trending : getFallbackTracks(undefined, halfHourSeed);
         for (const t of fallback) {
           if (!seen.has(t.id)) {
             tracks.push(t);
@@ -418,14 +481,14 @@ serve(async (req) => {
       // Default: fetch trending
       tracks = await fetchFromInvidious();
       
-      // Use fallback if no results
+      // Use fallback if no results - with rotation based on time
       if (tracks.length === 0) {
-        console.log("Invidious failed, using fallback tracks");
-        tracks = getFallbackTracks();
+        console.log("Invidious failed, using fallback tracks with rotation");
+        tracks = getFallbackTracks(undefined, halfHourSeed);
       }
       
       // Shuffle for variety
-      tracks = seededShuffle(tracks, hourSeed);
+      tracks = seededShuffle(tracks, halfHourSeed);
     }
 
     console.log(`Returning ${tracks.length} tracks`);
@@ -435,9 +498,10 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("Suggestions error:", error);
-    // Return fallback tracks on error
+    // Return fallback tracks on error - with rotation
+    const halfHourSeed = Math.floor(Date.now() / (1000 * 60 * 30));
     return new Response(
-      JSON.stringify({ tracks: getFallbackTracks().slice(0, 20) }),
+      JSON.stringify({ tracks: getFallbackTracks(undefined, halfHourSeed).slice(0, 20) }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
