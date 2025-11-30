@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Grid3X3, List, ChevronDown, Music, Mic2, Heart, Loader2 } from "lucide-react";
+import { Plus, Grid3X3, List, ChevronDown, Music, Mic2, Heart, Loader2, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useOfflineMusic } from "@/hooks/useOfflineMusic";
 
 type ViewMode = "grid" | "list";
 type FilterType = "all" | "playlists" | "albums" | "artists" | "podcasts";
@@ -48,6 +49,7 @@ const Library = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { downloads } = useOfflineMusic();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -160,6 +162,16 @@ const Library = () => {
       icon: Heart,
       isPinned: true,
       route: "/liked-songs",
+    },
+    {
+      id: "downloads",
+      type: "playlist" as const,
+      title: "Downloads",
+      subtitle: `${downloads.length} ${downloads.length === 1 ? "song" : "songs"} offline`,
+      imageUrl: null,
+      icon: Download,
+      isPinned: true,
+      route: "/downloads",
     },
   ];
 
