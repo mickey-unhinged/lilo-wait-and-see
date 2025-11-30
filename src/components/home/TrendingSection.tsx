@@ -89,6 +89,8 @@ export function TrendingSection() {
             isPlaying={currentTrack?.id === track.id && isPlaying}
             variant="large"
             onClick={() => handleTrackClick(track)}
+            track={track}
+            showDownload
           />
         ))}
       </HorizontalScroll>

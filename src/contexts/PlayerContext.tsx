@@ -3,6 +3,7 @@ import { createContext, useContext, useState, useRef, useEffect, useCallback } f
 import { supabase } from "@/integrations/supabase/client";
 import { audioEffects } from "@/lib/equalizer";
 import { useSettings } from "@/hooks/useSettings";
+import { getOfflineAudioUrlDirect } from "@/hooks/useOfflineMusic";
 
 export interface Track {
   id: string;
@@ -424,8 +425,15 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
       
       let audioUrl = track.audio_url;
       
-      // If it's a video-sourced track, fetch the audio URL
-      if (track.videoId && !audioUrl) {
+      // Check for offline audio first
+      const offlineUrl = await getOfflineAudioUrlDirect(track.id);
+      if (offlineUrl) {
+        console.log("Using offline audio for:", track.title);
+        audioUrl = offlineUrl;
+      }
+      
+      // If no offline and it's a video-sourced track, fetch the audio URL
+      if (!audioUrl && track.videoId) {
         try {
           const { data, error } = await supabase.functions.invoke("youtube-audio-stream", {
             body: { videoId: track.videoId },

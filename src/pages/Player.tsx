@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ChevronDown, MoreHorizontal, Heart, Share2, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Volume2, Music2, Video, PlusCircle, Radio, User, Flag } from "lucide-react";
+import { ChevronDown, MoreHorizontal, Heart, Share2, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Volume2, Music2, Video, PlusCircle, Radio, User, Flag, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
@@ -15,6 +15,7 @@ import { Watermark } from "@/components/common/Watermark";
 import { ShareToFriendsSheet } from "@/components/inbox/ShareToFriendsSheet";
 import { AddToPlaylistSheet } from "@/components/playlist/AddToPlaylistSheet";
 import { QueueManager } from "@/components/player/QueueManager";
+import { DownloadButton } from "@/components/player/DownloadButton";
 import { supabase } from "@/integrations/supabase/client";
 
 function formatTime(seconds: number): string {
@@ -194,6 +195,13 @@ const Player = () => {
               <DropdownMenuItem onClick={handleShare}>
                 <Share2 className="w-4 h-4 mr-2" />
                 Share
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <div className="flex items-center px-2 py-1.5">
+                  <Download className="w-4 h-4 mr-2" />
+                  <span className="flex-1">Download</span>
+                  {track && <DownloadButton track={track} size="sm" className="ml-auto" />}
+                </div>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleReportIssue}>
                 <Flag className="w-4 h-4 mr-2" />

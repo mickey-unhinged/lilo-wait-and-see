@@ -108,6 +108,8 @@ export function ForYouSection() {
             artist={track.artist_name}
             imageUrl={track.cover_url || `https://i.ytimg.com/vi/${track.videoId}/hqdefault.jpg`}
             onClick={() => handleTrackClick(track)}
+            track={track}
+            showDownload
           />
         ))}
       </HorizontalScroll>
