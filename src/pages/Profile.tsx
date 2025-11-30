@@ -26,7 +26,7 @@ const Profile = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { theme, toggleTheme } = useTheme();
-  const { settings, toggleSetting } = useSettings();
+  const { settings, toggleSetting, updateSetting } = useSettings();
   const musicMood = useMusicMood();
   const profileStats = useProfileStats(user?.id);
 
@@ -152,6 +152,20 @@ const Profile = () => {
                   }}
                 />
               </div>
+              {settings.crossfade && (
+                <div className="space-y-2 px-2">
+                  <Slider
+                    value={[settings.crossfadeDuration]}
+                    min={0.5}
+                    max={10}
+                    step={0.5}
+                    onValueChange={([value]) => updateSetting("crossfadeDuration", value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {settings.crossfadeDuration.toFixed(1)}s blend
+                  </p>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium">Gapless Playback</p>
@@ -162,10 +176,15 @@ const Profile = () => {
                   onCheckedChange={() => toggleSetting("gaplessPlayback")}
                 />
               </div>
-              <div className="space-y-2">
-                <p className="font-medium">Volume Normalization</p>
-                <p className="text-sm text-muted-foreground">Keeps volume consistent across tracks</p>
-                <Slider defaultValue={[75]} max={100} step={1} className="mt-2" />
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Volume Normalization</p>
+                  <p className="text-sm text-muted-foreground">Keep playback levels consistent</p>
+                </div>
+                <Switch
+                  checked={settings.volumeNormalization}
+                  onCheckedChange={() => toggleSetting("volumeNormalization")}
+                />
               </div>
             </>
           )}

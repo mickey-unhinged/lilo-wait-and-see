@@ -11,7 +11,7 @@ export function VideoPreview({ videoId, title }: VideoPreviewProps) {
       <div className="flex flex-col items-center justify-center h-full py-12 text-muted-foreground">
         <VideoOff className="w-12 h-12 mb-4 opacity-50" />
         <p className="text-sm">Video not available</p>
-        <p className="text-xs mt-1 opacity-70">Only YouTube Music tracks have video</p>
+        <p className="text-xs mt-1 opacity-70">Only Lilo Live tracks include video playback</p>
       </div>
     );
   }
@@ -28,7 +28,7 @@ export function VideoPreview({ videoId, title }: VideoPreviewProps) {
         />
       </div>
       <p className="text-xs text-muted-foreground text-center mt-3">
-        Video preview from YouTube
+        Video preview powered by Lilo Live
       </p>
     </div>
   );

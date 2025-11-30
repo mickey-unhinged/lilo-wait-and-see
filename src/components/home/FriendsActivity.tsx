@@ -1,14 +1,16 @@
-import { useState, useEffect } from "react";
-import { Users, Music, Loader2 } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Users, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
+import type { RealtimePostgresInsertPayload } from "@supabase/supabase-js";
 
 interface Activity {
   user_id: string;
   track_title: string;
   track_artist: string;
   track_cover: string | null;
+  track_source?: string | null;
   played_at: string;
   profile?: {
     username: string | null;
@@ -17,37 +19,144 @@ interface Activity {
   };
 }
 
+interface ListeningRow {
+  user_id: string;
+  track_title: string;
+  track_artist: string | null;
+  track_cover: string | null;
+  track_source?: string | null;
+  played_at: string;
+}
+
+interface ProfileRow {
+  id: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+}
+
 export function FriendsActivity() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [followedIds, setFollowedIds] = useState<string[]>([]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setCurrentUserId(session?.user?.id || null);
-      if (session?.user?.id) {
-        fetchFriendsActivity(session.user.id);
-      } else {
-        setIsLoading(false);
-      }
     });
   }, []);
 
-  // Subscribe to realtime play history updates
+  const fetchFriendsActivity = useCallback(async (followingIds: string[]) => {
+    if (followingIds.length === 0) {
+      setActivities([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from<ListeningRow>("listening_activity")
+        .select(`
+          user_id,
+          track_id,
+          track_title,
+          track_artist,
+          track_cover,
+          track_source,
+          played_at
+        `)
+        .in("user_id", followingIds)
+        .order("played_at", { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+      const userIds = (data || []).map((row) => row.user_id);
+      const { data: profiles } = await supabase
+        .from<ProfileRow>("profiles")
+        .select("id, username, display_name, avatar_url")
+        .in("id", userIds);
+
+      setActivities(
+        (data || []).map((row) => ({
+          user_id: row.user_id,
+          track_title: row.track_title,
+          track_artist: row.track_artist || "Unknown Artist",
+          track_cover: row.track_cover,
+          track_source: row.track_source,
+          played_at: row.played_at,
+          profile: profiles?.find((profile) => profile.id === row.user_id),
+        }))
+      );
+    } catch (error) {
+      console.error("Failed to fetch friends activity:", error);
+      setActivities([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const loadFollowing = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("user_follows")
+        .select("following_id")
+        .eq("follower_id", userId);
+
+      if (error) throw error;
+
+      const ids = data?.map((f) => f.following_id) || [];
+      setFollowedIds(ids);
+      fetchFriendsActivity(ids);
+    } catch (error) {
+      console.error("Failed to load following users:", error);
+      setFollowedIds([]);
+      setActivities([]);
+      setIsLoading(false);
+    }
+  }, [fetchFriendsActivity]);
+
   useEffect(() => {
-    if (!currentUserId) return;
+    if (currentUserId) {
+      loadFollowing(currentUserId);
+    } else {
+      setIsLoading(false);
+    }
+  }, [currentUserId, loadFollowing]);
+
+  // Subscribe to realtime listening updates from followed users
+  useEffect(() => {
+    if (!currentUserId || followedIds.length === 0) return;
 
     const channel = supabase
-      .channel("play-history-changes")
+      .channel("listening-activity-feed")
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
-          table: "play_history",
+          table: "listening_activity",
         },
-        () => {
-          fetchFriendsActivity(currentUserId);
+        (payload: RealtimePostgresInsertPayload<ListeningRow>) => {
+          const newUserId = payload.new?.user_id;
+          if (newUserId && followedIds.includes(newUserId)) {
+            fetchFriendsActivity(followedIds);
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "listening_activity",
+        },
+        (payload: RealtimePostgresInsertPayload<ListeningRow>) => {
+          const updatedUserId = payload.new?.user_id;
+          if (updatedUserId && followedIds.includes(updatedUserId)) {
+            fetchFriendsActivity(followedIds);
+          }
         }
       )
       .subscribe();
@@ -55,68 +164,7 @@ export function FriendsActivity() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentUserId]);
-
-  const fetchFriendsActivity = async (userId: string) => {
-    setIsLoading(true);
-    try {
-      // Get following users
-      const { data: following } = await supabase
-        .from("user_follows")
-        .select("following_id")
-        .eq("follower_id", userId);
-
-      if (!following || following.length === 0) {
-        setActivities([]);
-        return;
-      }
-
-      const followingIds = following.map((f) => f.following_id);
-
-      // Get recent play history for following users
-      const { data: playHistory } = await supabase
-        .from("play_history")
-        .select(`
-          user_id,
-          played_at,
-          tracks (
-            title,
-            cover_url,
-            artists (name)
-          )
-        `)
-        .in("user_id", followingIds)
-        .order("played_at", { ascending: false })
-        .limit(10);
-
-      if (!playHistory) {
-        setActivities([]);
-        return;
-      }
-
-      // Get profiles for these users
-      const userIds = [...new Set(playHistory.map((p) => p.user_id))];
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, username, display_name, avatar_url")
-        .in("id", userIds);
-
-      const activitiesWithProfiles = playHistory.map((play: any) => ({
-        user_id: play.user_id,
-        track_title: play.tracks?.title || "Unknown Track",
-        track_artist: play.tracks?.artists?.name || "Unknown Artist",
-        track_cover: play.tracks?.cover_url || null,
-        played_at: play.played_at,
-        profile: profiles?.find((p) => p.id === play.user_id),
-      }));
-
-      setActivities(activitiesWithProfiles);
-    } catch (error) {
-      console.error("Failed to fetch friends activity:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [currentUserId, followedIds, fetchFriendsActivity]);
 
   if (!currentUserId) {
     return null;

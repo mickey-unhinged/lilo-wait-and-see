@@ -1,6 +1,8 @@
 import * as React from "react";
 import { createContext, useContext, useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { audioEffects } from "@/lib/equalizer";
+import { useSettings } from "@/hooks/useSettings";
 
 export interface Track {
   id: string;
@@ -16,7 +18,7 @@ export interface Track {
   duration_ms: number;
   plays?: number;
   is_explicit?: boolean;
-  videoId?: string; // For YouTube Music tracks
+  videoId?: string; // For video-enabled tracks
 }
 
 interface PlayerState {
@@ -148,6 +150,7 @@ function updateMediaSession(track: Track | null, isPlaying: boolean, handlers: {
 
 export function PlayerProvider({ children }: PlayerProviderProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const currentTrackRef = useRef<Track | null>(null);
   const [state, setState] = useState<PlayerState>(() => {
     // Try to restore previous state
     const saved = loadPlaybackState();
@@ -164,16 +167,59 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     };
   });
 
+  const [userId, setUserId] = useState<string | null>(null);
+  const { settings } = useSettings();
+  const settingsRef = useRef(settings);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+  const crossfadeDuration = settings.crossfade ? Math.max(0.5, settings.crossfadeDuration) : 0;
+
   // Reference to next function for the ended handler
   const nextRef = useRef<() => void>(() => {});
+
+  // Track auth state for logging listening history
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id || null);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id || null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Initialize audio element
   useEffect(() => {
     audioRef.current = new Audio();
-    audioRef.current.volume = state.volume;
+    audioRef.current.crossOrigin = "anonymous";
+    audioRef.current.volume = 0.8;
+    audioRef.current.muted = false; // Ensure not muted initially
+    
+    // Attach to audio effects
+    audioEffects.attachAudioElement(audioRef.current);
+    
+    // Wait a bit to check if Web Audio API is actually working
+    setTimeout(() => {
+      if (audioRef.current) {
+        const isActive = audioEffects.isActive();
+        console.log("Audio initialization - Web Audio API active:", isActive);
+        if (!isActive) {
+          // If Web Audio API is not active, ensure element is not muted
+          audioRef.current.muted = false;
+          console.log("Web Audio API not active, ensuring audio element is not muted");
+        }
+      }
+    }, 100);
+    
+    audioEffects.setMasterVolume(0.8);
+    audioEffects.resume();
     
     const audio = audioRef.current;
-    
     const handleTimeUpdate = () => {
       setState(prev => {
         const newState = {
@@ -202,15 +248,18 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     };
     
     const handleEnded = () => {
+      const gapless = settingsRef.current.gaplessPlayback;
       setState(prev => {
         if (prev.repeatMode === "one") {
           audio.currentTime = 0;
           audio.play();
           return prev;
         }
-        // Auto-play next track
         if (prev.queue.length > 0) {
-          // Call next() after state update
+          if (gapless) {
+            nextRef.current();
+            return prev;
+          }
           setTimeout(() => nextRef.current(), 0);
         }
         return { ...prev, isPlaying: false };
@@ -244,15 +293,34 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
 
   // Update volume when state changes
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = state.volume;
+    if (!audioRef.current) return;
+    
+    // Always update volume through audioEffects (handles both Web Audio API and direct)
+    audioEffects.setMasterVolume(state.volume);
+    
+    // Also ensure direct element volume is set as backup
+    audioRef.current.volume = state.volume;
+    
+    // Only keep muted if Web Audio API is actually working and connected
+    const isActive = audioEffects.isActive();
+    if (!isActive) {
+      audioRef.current.muted = false;
     }
   }, [state.volume]);
+
+  useEffect(() => {
+    audioEffects.setNormalization(settings.volumeNormalization);
+  }, [settings.volumeNormalization]);
+
+  useEffect(() => {
+    currentTrackRef.current = state.currentTrack;
+  }, [state.currentTrack]);
 
   // Restore track on mount if there was a saved state
   useEffect(() => {
     const saved = loadPlaybackState();
     if (saved?.track && audioRef.current) {
+      let cancelled = false;
       // Load the track but don't play it
       const loadSavedTrack = async () => {
         let audioUrl = saved.track?.audio_url;
@@ -270,7 +338,11 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
           }
         }
         
+        if (cancelled) return;
         if (audioUrl && audioRef.current) {
+          if (currentTrackRef.current && currentTrackRef.current.id !== saved.track.id) {
+            return;
+          }
           audioRef.current.src = audioUrl;
           audioRef.current.load();
           // Set the saved progress
@@ -283,22 +355,78 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
       };
       
       loadSavedTrack();
+      return () => {
+        cancelled = true;
+      };
     }
   }, []);
 
-  const play = useCallback(async (track?: Track) => {
+  const logListeningActivity = useCallback(async (track: Track | undefined) => {
+    if (!userId || !track) return;
+    try {
+      await supabase
+        .from("listening_activity")
+        .upsert(
+          {
+            user_id: userId,
+            track_id: track.id,
+            track_title: track.title,
+            track_artist: track.artist_name,
+            track_cover: track.cover_url || track.album_cover || null,
+            track_source: track.id?.startsWith("ytm-")
+              ? "video"
+              : track.id?.startsWith("itunes-")
+                ? "preview"
+                : "library",
+            played_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id" }
+        );
+    } catch (err) {
+      console.error("Failed to log listening activity:", err);
+    }
+  }, [userId]);
+
+  const play = useCallback(async (track?: Track, options?: { skipFade?: boolean }) => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio) {
+      console.error("Audio element not initialized");
+      return;
+    }
+    
+    // Ensure audio context is resumed
+    await audioEffects.resume();
+    
+    // CRITICAL: Always ensure audio is not muted unless Web Audio API is confirmed active
+    const isAudioEffectsActive = audioEffects.isActive();
+    if (!isAudioEffectsActive) {
+      audio.muted = false;
+      console.log("Web Audio API not active, using direct playback");
+    }
+    
+    const shouldCrossfade = Boolean(
+      track &&
+      settings.crossfade &&
+      crossfadeDuration > 0 &&
+      state.isPlaying &&
+      !options?.skipFade
+    );
+    
+    if (shouldCrossfade) {
+      await audioEffects.fadeTo(0, crossfadeDuration / 2, audio);
+    }
     
     if (track) {
+      console.log("Playing track:", track.title, "audio_url:", track.audio_url);
       setState(prev => ({ ...prev, currentTrack: track, isLoading: true }));
+      logListeningActivity(track);
       
       // Save to play history
       saveToPlayHistory(track);
       
       let audioUrl = track.audio_url;
       
-      // If it's a YouTube Music track, fetch the audio URL
+      // If it's a video-sourced track, fetch the audio URL
       if (track.videoId && !audioUrl) {
         try {
           const { data, error } = await supabase.functions.invoke("youtube-audio-stream", {
@@ -308,7 +436,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
           if (error) throw error;
           audioUrl = data?.audioUrl;
         } catch (err) {
-          console.error("Failed to get YouTube audio URL:", err);
+          console.error("Failed to get video audio URL:", err);
           setState(prev => ({ ...prev, isLoading: false, isPlaying: false }));
           return;
         }
@@ -316,20 +444,108 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
       
       // Use demo audio as fallback
       if (!audioUrl) {
+        console.warn("No audio URL for track, using fallback:", track.title);
         audioUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
       }
       
+      // Validate audio URL
+      if (!audioUrl || audioUrl.trim() === "") {
+        console.error("No valid audio URL for track:", track.title);
+        setState(prev => ({ ...prev, isLoading: false, isPlaying: false }));
+        return;
+      }
+      
+      console.log("Setting audio source:", audioUrl);
       audio.src = audioUrl;
       audio.load();
+      
+      // Wait for audio to be ready before playing
+      const playAudio = () => {
+        console.log("Attempting to play audio. Muted:", audio.muted, "Volume:", audio.volume, "Web Audio Active:", isAudioEffectsActive);
+        
+        // CRITICAL: Set volume and unmute before playing
+        if (isAudioEffectsActive) {
+          // Use Web Audio API
+          if (settings.crossfade && crossfadeDuration > 0 && track) {
+            audioEffects.setMasterVolume(0);
+          } else {
+            audioEffects.setMasterVolume(state.volume);
+          }
+        } else {
+          // Direct playback - ensure not muted and volume is set
+          audio.muted = false;
+          if (settings.crossfade && crossfadeDuration > 0 && track) {
+            audio.volume = 0;
+          } else {
+            audio.volume = state.volume;
+          }
+        }
+        
+        console.log("Before play - muted:", audio.muted, "volume:", audio.volume, "src:", audio.src);
+        
+        audio.play().then(() => {
+          console.log("Audio play() succeeded");
+          setState(prev => ({ ...prev, isPlaying: true }));
+          if (settings.crossfade && crossfadeDuration > 0 && track) {
+            audioEffects.fadeTo(state.volume, crossfadeDuration / 2, audio);
+          }
+        }).catch(err => {
+          console.error("Playback error:", err);
+          setState(prev => ({ ...prev, isPlaying: false, isLoading: false }));
+          
+          // Fallback: Force unmute and try again
+          console.log("Attempting fallback playback");
+          audio.muted = false;
+          audio.volume = state.volume;
+          audio.play().then(() => {
+            console.log("Fallback playback succeeded");
+            setState(prev => ({ ...prev, isPlaying: true }));
+          }).catch(fallbackErr => {
+            console.error("Fallback playback also failed:", fallbackErr);
+          });
+        });
+      };
+      
+      // Wait for audio to be ready
+      if (audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+        playAudio();
+      } else {
+        const handleCanPlayThrough = () => {
+          playAudio();
+          audio.removeEventListener("canplaythrough", handleCanPlayThrough);
+        };
+        const handleCanPlay = () => {
+          playAudio();
+          audio.removeEventListener("canplay", handleCanPlay);
+        };
+        audio.addEventListener("canplaythrough", handleCanPlayThrough);
+        audio.addEventListener("canplay", handleCanPlay);
+        // Fallback timeout
+        setTimeout(() => {
+          audio.removeEventListener("canplaythrough", handleCanPlayThrough);
+          audio.removeEventListener("canplay", handleCanPlay);
+          if (audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+            playAudio();
+          } else {
+            console.warn("Audio not ready after timeout, attempting to play anyway");
+            playAudio();
+          }
+        }, 5000);
+      }
+    } else {
+      // Resume playing current track
+      // Ensure not muted
+      if (!isAudioEffectsActive) {
+        audio.muted = false;
+      }
+      audio.play().then(() => {
+        setState(prev => ({ ...prev, isPlaying: true }));
+      }).catch(err => {
+        console.error("Playback error:", err);
+        setState(prev => ({ ...prev, isPlaying: false }));
+      });
     }
-    
-    audio.play().then(() => {
-      setState(prev => ({ ...prev, isPlaying: true }));
-    }).catch(err => {
-      console.error("Playback error:", err);
-      setState(prev => ({ ...prev, isPlaying: false, isLoading: false }));
-    });
-  }, []);
+  }, [logListeningActivity, settings.crossfade, crossfadeDuration, state.isPlaying, state.volume]);
 
   const pause = useCallback(() => {
     audioRef.current?.pause();
@@ -362,7 +578,9 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
   }, []);
 
   const setVolume = useCallback((volume: number) => {
-    setState(prev => ({ ...prev, volume }));
+    // Clamp volume between 0 and 1
+    const clampedVolume = Math.max(0, Math.min(1, volume));
+    setState(prev => ({ ...prev, volume: clampedVolume }));
   }, []);
 
   const toggleShuffle = useCallback(() => {

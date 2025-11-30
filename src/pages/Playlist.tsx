@@ -10,6 +10,7 @@ import { CollaboratorInvite } from "@/components/playlist/CollaboratorInvite";
 import { Switch } from "@/components/ui/switch";
 import { AddSongsToPlaylist } from "@/components/playlist/AddSongsToPlaylist";
 import { PlaylistCoverUpload } from "@/components/playlist/PlaylistCoverUpload";
+import { getPlaylistStreamTracks, onPlaylistStreamsUpdated } from "@/lib/playlistStreams";
 
 const formatDuration = (ms: number) => {
   const minutes = Math.floor(ms / 60000);
@@ -23,12 +24,24 @@ const Playlist = () => {
   const { currentTrack, isPlaying, playTrack, setQueue } = usePlayer();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isCollaborative, setIsCollaborative] = useState(false);
+  const [streamTracks, setStreamTracks] = useState<Track[]>([]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setCurrentUserId(user?.id || null);
     });
   }, []);
+
+  useEffect(() => {
+    if (!id || id === "liked") return;
+    setStreamTracks(getPlaylistStreamTracks(id));
+    const unsubscribe = onPlaylistStreamsUpdated((updatedId) => {
+      if (!updatedId || updatedId === id) {
+        setStreamTracks(getPlaylistStreamTracks(id));
+      }
+    });
+    return unsubscribe;
+  }, [id]);
   
   // Fetch playlist from database
   const { data: playlist, isLoading: playlistLoading, refetch: refetchPlaylist } = useQuery({
@@ -93,9 +106,15 @@ const Playlist = () => {
         title: pt.tracks?.title || "",
         artist_id: pt.tracks?.artist_id || "",
         artist_name: pt.tracks?.artists?.name || "Unknown",
-        cover_url: pt.tracks?.cover_url || pt.tracks?.albums?.cover_url || "",
-        audio_url: pt.tracks?.audio_url || "",
+        artist_avatar: pt.tracks?.artists?.avatar_url || undefined,
+        album_id: pt.tracks?.album_id || undefined,
+        album_title: pt.tracks?.albums?.title || undefined,
+        album_cover: pt.tracks?.albums?.cover_url || undefined,
+        cover_url: pt.tracks?.cover_url || pt.tracks?.albums?.cover_url || undefined,
+        audio_url: pt.tracks?.audio_url || undefined,
         duration_ms: pt.tracks?.duration_ms || 0,
+        plays: pt.tracks?.plays || 0,
+        is_explicit: pt.tracks?.is_explicit || false,
       })) as Track[];
     },
     enabled: !!id && id !== "liked",
@@ -128,17 +147,24 @@ const Playlist = () => {
         title: lt.tracks?.title || "",
         artist_id: lt.tracks?.artist_id || "",
         artist_name: lt.tracks?.artists?.name || "Unknown",
-        cover_url: lt.tracks?.cover_url || lt.tracks?.albums?.cover_url || "",
-        audio_url: lt.tracks?.audio_url || "",
+        artist_avatar: lt.tracks?.artists?.avatar_url || undefined,
+        album_id: lt.tracks?.album_id || undefined,
+        album_title: lt.tracks?.albums?.title || undefined,
+        album_cover: lt.tracks?.albums?.cover_url || undefined,
+        cover_url: lt.tracks?.cover_url || lt.tracks?.albums?.cover_url || undefined,
+        audio_url: lt.tracks?.audio_url || undefined,
         duration_ms: lt.tracks?.duration_ms || 0,
+        plays: lt.tracks?.plays || 0,
+        is_explicit: lt.tracks?.is_explicit || false,
       })) as Track[];
     },
     enabled: id === "liked",
   });
 
   const isLikedSongs = id === "liked";
-  const tracks = isLikedSongs ? likedTracks : playlistTracks;
+  const baseTracks = isLikedSongs ? likedTracks : playlistTracks;
   const isLoading = isLikedSongs ? likedLoading : (playlistLoading || tracksLoading);
+  const tracks: Track[] = isLikedSongs ? (baseTracks || []) : [...(baseTracks || []), ...streamTracks];
 
   const playlistInfo = isLikedSongs 
     ? { title: "Liked Songs", description: "Your favorite tracks", cover_url: null }
@@ -205,7 +231,7 @@ const Playlist = () => {
             
             <h1 className="text-2xl font-bold font-display mb-2">{playlistInfo?.title || "Playlist"}</h1>
             <p className="text-muted-foreground text-sm mb-4">{playlistInfo?.description || ""}</p>
-            <p className="text-xs text-muted-foreground">{tracks?.length || 0} songs</p>
+            <p className="text-xs text-muted-foreground">{tracks.length} songs</p>
           </div>
           
           {/* Action buttons */}
@@ -215,7 +241,7 @@ const Playlist = () => {
             </button>
             <button 
               onClick={handlePlayAll}
-              disabled={!tracks || tracks.length === 0}
+              disabled={tracks.length === 0}
               className="w-14 h-14 rounded-full gradient-bg flex items-center justify-center glow-primary hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Play className="w-7 h-7 text-primary-foreground ml-1" fill="currentColor" />
@@ -257,7 +283,7 @@ const Playlist = () => {
           <div className="flex items-center justify-center py-12">
             <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : !tracks || tracks.length === 0 ? (
+        ) : tracks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="w-16 h-16 rounded-full bg-card/50 flex items-center justify-center mb-4">
               <Music className="w-8 h-8 text-muted-foreground" />
@@ -275,7 +301,9 @@ const Playlist = () => {
               <Clock className="w-4 h-4" />
             </div>
             
-            {tracks.map((track, index) => (
+            {tracks.map((track, index) => {
+              const isStreamTrack = track.id.startsWith("ytm-") || track.id.startsWith("itunes-") || track.id.length < 20;
+              return (
               <button
                 key={track.id}
                 onClick={() => handleTrackClick(track)}
@@ -300,7 +328,7 @@ const Playlist = () => {
                 </span>
                 
                 <img
-                  src={track.cover_url || "https://images.unsplash.com/photo-1614149162883-504ce4d13909?w=200&h=200&fit=crop"}
+                  src={track.cover_url || track.album_cover || "https://images.unsplash.com/photo-1614149162883-504ce4d13909?w=200&h=200&fit=crop"}
                   alt={track.title}
                   className="w-12 h-12 rounded-lg object-cover"
                 />
@@ -312,7 +340,14 @@ const Playlist = () => {
                   )}>
                     {track.title}
                   </h3>
-                  <p className="text-xs text-muted-foreground truncate">{track.artist_name}</p>
+                  <p className="text-xs text-muted-foreground truncate flex items-center gap-2">
+                    {track.artist_name}
+                    {isStreamTrack && (
+                      <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide">
+                        Stream
+                      </span>
+                    )}
+                  </p>
                 </div>
                 
                 <span className="text-xs text-muted-foreground">
@@ -326,7 +361,8 @@ const Playlist = () => {
                   <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
                 </button>
               </button>
-            ))}
+            );
+            })}
           </>
         )}
       </div>

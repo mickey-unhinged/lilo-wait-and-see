@@ -6,6 +6,7 @@ import { Loader2, Plus, Music } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Track } from "@/contexts/PlayerContext";
+import { addStreamTrackToPlaylist } from "@/lib/playlistStreams";
 
 interface Playlist {
   id: string;
@@ -54,8 +55,17 @@ export function AddToPlaylistSheet({ isOpen, onClose, track }: AddToPlaylistShee
     }
   };
 
+  const isStreamingTrack = !!track?.id && (track.id.startsWith("ytm-") || track.id.startsWith("itunes-") || track.id.length < 20);
+
   const addToPlaylist = async (playlistId: string) => {
     if (!track) return;
+
+    if (isStreamingTrack) {
+      addStreamTrackToPlaylist(playlistId, track);
+      toast({ title: "Added to playlist!" });
+      onClose();
+      return;
+    }
 
     try {
       // Get current max position
@@ -82,8 +92,9 @@ export function AddToPlaylistSheet({ isOpen, onClose, track }: AddToPlaylistShee
 
       toast({ title: "Added to playlist!" });
       onClose();
-    } catch (error: any) {
-      if (error.code === "23505") {
+    } catch (error) {
+      const dbError = error as { code?: string };
+      if (dbError.code === "23505") {
         toast({ title: "Track already in playlist", variant: "destructive" });
       } else {
         console.error("Failed to add to playlist:", error);
@@ -113,16 +124,19 @@ export function AddToPlaylistSheet({ isOpen, onClose, track }: AddToPlaylistShee
 
       if (playlistError) throw playlistError;
 
-      // Add track to playlist
-      const { error: trackError } = await supabase
-        .from("playlist_tracks")
-        .insert({
-          playlist_id: playlist.id,
-          track_id: track.id,
-          position: 0,
-        });
+      if (isStreamingTrack) {
+        addStreamTrackToPlaylist(playlist.id, track);
+      } else {
+        const { error: trackError } = await supabase
+          .from("playlist_tracks")
+          .insert({
+            playlist_id: playlist.id,
+            track_id: track.id,
+            position: 0,
+          });
 
-      if (trackError) throw trackError;
+        if (trackError) throw trackError;
+      }
 
       toast({ title: "Playlist created and track added!" });
       setNewPlaylistName("");
@@ -146,7 +160,7 @@ export function AddToPlaylistSheet({ isOpen, onClose, track }: AddToPlaylistShee
         {track && (
           <div className="flex items-center gap-3 py-4 border-b border-border/50">
             <img
-              src={track.cover_url || "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=60&h=60&fit=crop"}
+              src={track.cover_url || track.album_cover || "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=60&h=60&fit=crop"}
               alt={track.title}
               className="w-12 h-12 rounded-lg object-cover"
             />
@@ -154,6 +168,9 @@ export function AddToPlaylistSheet({ isOpen, onClose, track }: AddToPlaylistShee
               <p className="font-medium truncate">{track.title}</p>
               <p className="text-sm text-muted-foreground truncate">{track.artist_name}</p>
             </div>
+            {isStreamingTrack && (
+              <p className="text-xs text-red-500 font-medium">Streaming track</p>
+            )}
           </div>
         )}
 

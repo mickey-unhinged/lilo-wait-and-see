@@ -3,7 +3,7 @@ import { ChevronDown, MoreHorizontal, Heart, Share2, Play, Pause, SkipBack, Skip
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
-import { usePlayer } from "@/contexts/PlayerContext";
+import { usePlayer, Track } from "@/contexts/PlayerContext";
 import { demoTracks } from "@/hooks/useTracks";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Watermark } from "@/components/common/Watermark";
 import { ShareToFriendsSheet } from "@/components/inbox/ShareToFriendsSheet";
 import { AddToPlaylistSheet } from "@/components/playlist/AddToPlaylistSheet";
+import { supabase } from "@/integrations/supabase/client";
 
 function formatTime(seconds: number): string {
   if (!seconds || isNaN(seconds)) return "0:00";
@@ -52,6 +53,7 @@ const Player = () => {
   const [showLyrics, setShowLyrics] = useState(false);
   const [showShareSheet, setShowShareSheet] = useState(false);
   const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
+  const [isStartingRadio, setIsStartingRadio] = useState(false);
   
   // Auto-play first demo track if no track is loaded
   useEffect(() => {
@@ -99,15 +101,46 @@ const Player = () => {
   };
 
   const handleGoToArtist = () => {
-    toast({ title: "Coming soon", description: "Artist page is coming soon!" });
+    if (!track?.artist_name) {
+      toast({ title: "Artist unavailable", description: "We couldn't find artist info for this track.", variant: "destructive" });
+      return;
+    }
+    const slug = encodeURIComponent(track.artist_name);
+    navigate(`/artist/${slug}`);
   };
 
-  const handleStartRadio = () => {
-    toast({ title: "Starting Radio", description: `Creating a radio station based on ${track?.title}` });
+  const handleStartRadio = async () => {
+    if (!track?.artist_name) {
+      toast({ title: "Radio unavailable", description: "Play a catalog track to start radio.", variant: "destructive" });
+      return;
+    }
+
+    setIsStartingRadio(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("trending-suggestions", {
+        body: { type: "personalized", seedArtists: [track.artist_name], limit: 25 },
+      });
+      if (error) throw error;
+      const suggestions: Track[] = data?.tracks || [];
+      if (suggestions.length === 0) {
+        toast({ title: "Radio unavailable", description: "Try again in a moment.", variant: "destructive" });
+        return;
+      }
+      setQueue(suggestions);
+      playTrack(suggestions[0], suggestions);
+      toast({ title: `${track.artist_name} Radio`, description: "We queued up fresh recommendations." });
+    } catch (error) {
+      console.error("Failed to start radio:", error);
+      toast({ title: "Radio unavailable", description: "Please try again later.", variant: "destructive" });
+    } finally {
+      setIsStartingRadio(false);
+    }
   };
 
   const handleReportIssue = () => {
-    toast({ title: "Reported", description: "Thank you for your feedback" });
+    const subject = encodeURIComponent("Player feedback");
+    const body = encodeURIComponent(`Issue while playing "${track?.title || "Unknown"}" by ${track?.artist_name || "Unknown Artist"}.\n\nDescribe the issue here:`);
+    window.open(`mailto:support@lilo.app?subject=${subject}&body=${body}`, "_blank");
   };
 
   return (
@@ -153,9 +186,9 @@ const Player = () => {
                 <User className="w-4 h-4 mr-2" />
                 Go to Artist
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleStartRadio}>
+              <DropdownMenuItem onClick={handleStartRadio} disabled={isStartingRadio}>
                 <Radio className="w-4 h-4 mr-2" />
-                Start Radio
+                {isStartingRadio ? "Starting…" : "Start Radio"}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleShare}>
@@ -417,7 +450,10 @@ const Player = () => {
             <Volume2 className="w-4 h-4 text-muted-foreground" />
             <Slider
               value={[volume * 100]}
-              onValueChange={([value]) => setVolume(value / 100)}
+              onValueChange={([value]) => {
+                const newVolume = Math.max(0, Math.min(1, value / 100));
+                setVolume(newVolume);
+              }}
               max={100}
               step={1}
               className="flex-1"

@@ -1,6 +1,6 @@
 import { Play, Pause, SkipForward, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useToast } from "@/hooks/use-toast";
@@ -9,6 +9,7 @@ export function MiniPlayer() {
   const { currentTrack, isPlaying, progress, duration, toggle, next, isLoading } = usePlayer();
   const { isLiked, toggleLike } = useLikedSongs();
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   // Don't render if no track
   if (!currentTrack) return null;
@@ -27,9 +28,17 @@ export function MiniPlayer() {
   };
   
   return (
-    <Link 
-      to="/player"
+    <div
+      onClick={() => navigate("/player")}
       className="block mx-3 mb-2 glass rounded-2xl overflow-hidden group cursor-pointer hover:bg-card/70 transition-all duration-300"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          navigate("/player");
+        }
+      }}
     >
       {/* Progress bar */}
       <div className="h-0.5 bg-muted/50">
@@ -62,7 +71,13 @@ export function MiniPlayer() {
         </div>
         
         {/* Controls */}
-        <div className="flex items-center gap-1" onClick={(e) => e.preventDefault()}>
+        <div
+          className="flex items-center gap-1"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        >
           <button
             onClick={handleLikeToggle}
             className={cn(
@@ -105,6 +120,6 @@ export function MiniPlayer() {
           </button>
         </div>
       </div>
-    </Link>
+    </div>
   );
 }

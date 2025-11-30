@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import type { Track } from "@/contexts/PlayerContext";
 
 interface ITunesResult {
@@ -22,7 +22,7 @@ export function useMusicSearch() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const searchMusic = async (query: string) => {
+  const searchMusic = useCallback(async (query: string) => {
     if (!query.trim()) {
       setResults([]);
       return;
@@ -45,18 +45,28 @@ export function useMusicSearch() {
 
       const tracks: Track[] = data.results
         .filter((item) => item.previewUrl) // Only include tracks with previews
-        .map((item) => ({
-          id: `itunes-${item.trackId}`,
-          title: item.trackName,
-          artist_id: `itunes-artist-${item.artistName.toLowerCase().replace(/\s+/g, "-")}`,
-          artist_name: item.artistName,
-          album_title: item.collectionName,
-          cover_url: item.artworkUrl100.replace("100x100", "400x400"), // Get higher res artwork
-          audio_url: item.previewUrl,
-          duration_ms: item.trackTimeMillis || 30000,
-          plays: 0,
-          is_explicit: false,
-        }));
+        .map((item) => {
+          // Get higher resolution artwork - try multiple sizes
+          let artworkUrl = item.artworkUrl100;
+          if (artworkUrl) {
+            // Try to get higher res version
+            artworkUrl = artworkUrl.replace("100x100", "600x600");
+          }
+          
+          return {
+            id: `itunes-${item.trackId}`,
+            title: item.trackName,
+            artist_id: `itunes-artist-${item.artistName.toLowerCase().replace(/\s+/g, "-")}`,
+            artist_name: item.artistName,
+            album_title: item.collectionName,
+            album_cover: artworkUrl || undefined,
+            cover_url: artworkUrl || undefined,
+            audio_url: item.previewUrl,
+            duration_ms: item.trackTimeMillis || 30000,
+            plays: 0,
+            is_explicit: false,
+          };
+        });
 
       setResults(tracks);
     } catch (err) {
@@ -66,12 +76,12 @@ export function useMusicSearch() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const clearResults = () => {
+  const clearResults = useCallback(() => {
     setResults([]);
     setError(null);
-  };
+  }, []);
 
   return {
     results,

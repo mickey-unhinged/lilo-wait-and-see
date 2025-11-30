@@ -39,18 +39,18 @@ export function PlaylistCoverUpload({ playlistId, currentCover, onUploadComplete
       // Create unique file name
       const fileExt = file.name.split(".").pop();
       const fileName = `${playlistId}-${Date.now()}.${fileExt}`;
-      const filePath = `playlist-covers/${fileName}`;
+      const filePath = `covers/${fileName}`;
 
       // Upload to storage
       const { error: uploadError } = await supabase.storage
-        .from("avatars")
+        .from("playlist-covers")
         .upload(filePath, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
-        .from("avatars")
+        .from("playlist-covers")
         .getPublicUrl(filePath);
 
       // Update playlist cover_url

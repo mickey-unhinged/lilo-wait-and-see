@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { RotateCcw } from "lucide-react";
 import { usePlayer } from "@/contexts/PlayerContext";
+import { audioEffects, EqualizerBandConfig } from "@/lib/equalizer";
 
 interface EqualizerBand {
   frequency: number;
@@ -45,7 +46,9 @@ export function Equalizer() {
         const { bands: savedBands, preset } = JSON.parse(saved);
         if (savedBands) return savedBands;
       }
-    } catch (e) {}
+    } catch (error) {
+      console.warn("Failed to load saved equalizer bands:", error);
+    }
     return DEFAULT_BANDS;
   });
   const [selectedPreset, setSelectedPreset] = useState<string>(() => {
@@ -55,7 +58,9 @@ export function Equalizer() {
         const { preset } = JSON.parse(saved);
         return preset || "flat";
       }
-    } catch (e) {}
+    } catch (error) {
+      console.warn("Failed to load saved equalizer preset:", error);
+    }
     return "flat";
   });
   const [isEnabled, setIsEnabled] = useState(() => {
@@ -65,15 +70,12 @@ export function Equalizer() {
         const { enabled } = JSON.parse(saved);
         return enabled !== false;
       }
-    } catch (e) {}
+    } catch (error) {
+      console.warn("Failed to load equalizer toggle state:", error);
+    }
     return true;
   });
-  
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const filtersRef = useRef<BiquadFilterNode[]>([]);
-  const gainNodeRef = useRef<GainNode | null>(null);
-  const isConnectedRef = useRef(false);
+  const [eqError, setEqError] = useState<string | null>(null);
 
   // Save settings whenever they change
   useEffect(() => {
@@ -83,93 +85,26 @@ export function Equalizer() {
         preset: selectedPreset,
         enabled: isEnabled,
       }));
-    } catch (e) {}
+    } catch (error) {
+      console.warn("Failed to persist equalizer settings:", error);
+    }
   }, [bands, selectedPreset, isEnabled]);
 
-  // Initialize and connect EQ to audio element
+  // Initialize EQ with audio effects manager
   useEffect(() => {
-    if (!audioElement || isConnectedRef.current) return;
-
+    if (!audioElement) return;
     try {
-      // Create audio context
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const audioContext = audioContextRef.current;
-      
-      // Resume audio context if suspended (important for playback to continue)
-      if (audioContext.state === 'suspended') {
-        audioContext.resume();
-      }
-
-      // Create source node from audio element
-      sourceNodeRef.current = audioContext.createMediaElementSource(audioElement);
-
-      // Create filters for each band
-      filtersRef.current = bands.map((band, index) => {
-        const filter = audioContext.createBiquadFilter();
-        
-        if (index === 0) {
-          filter.type = "lowshelf";
-        } else if (index === bands.length - 1) {
-          filter.type = "highshelf";
-        } else {
-          filter.type = "peaking";
-          filter.Q.value = 1.4;
-        }
-        
-        filter.frequency.value = band.frequency;
-        filter.gain.value = isEnabled ? band.gain : 0;
-        
-        return filter;
-      });
-
-      // Create gain node
-      gainNodeRef.current = audioContext.createGain();
-      gainNodeRef.current.gain.value = 1;
-
-      // Connect nodes in series: source -> filters -> gain -> destination
-      let lastNode: AudioNode = sourceNodeRef.current;
-      
-      filtersRef.current.forEach((filter) => {
-        lastNode.connect(filter);
-        lastNode = filter;
-      });
-      
-      lastNode.connect(gainNodeRef.current);
-      gainNodeRef.current.connect(audioContext.destination);
-
-      isConnectedRef.current = true;
-      console.log("Equalizer connected to audio element");
-    } catch (e) {
-      console.error("Failed to initialize equalizer:", e);
+      audioEffects.attachAudioElement(audioElement);
+      audioEffects.setEqualizer(
+        bands.map(({ frequency, gain }) => ({ frequency, gain })) as EqualizerBandConfig[],
+        isEnabled
+      );
+      setEqError(null);
+    } catch (error) {
+      console.error("Failed to initialize equalizer:", error);
+      setEqError("Equalizer isn't available for this track.");
     }
-
-    return () => {
-      // Cleanup on unmount
-      try {
-        filtersRef.current.forEach((filter) => {
-          try { filter.disconnect(); } catch (e) {}
-        });
-        try { gainNodeRef.current?.disconnect(); } catch (e) {}
-        try { sourceNodeRef.current?.disconnect(); } catch (e) {}
-        try { audioContextRef.current?.close(); } catch (e) {}
-        isConnectedRef.current = false;
-      } catch (e) {}
-    };
-  }, [audioElement]);
-
-  // Update filter gains when bands change
-  useEffect(() => {
-    // Resume audio context if suspended when adjusting EQ
-    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume();
-    }
-    
-    filtersRef.current.forEach((filter, index) => {
-      if (filter && bands[index]) {
-        filter.gain.value = isEnabled ? bands[index].gain : 0;
-      }
-    });
-  }, [bands, isEnabled]);
+  }, [audioElement, bands, isEnabled]);
 
   const handleBandChange = useCallback((index: number, value: number) => {
     setBands((prev) =>
@@ -207,6 +142,12 @@ export function Equalizer() {
       {!audioElement && (
         <p className="text-sm text-muted-foreground bg-card/50 p-3 rounded-lg">
           Play a song to activate the equalizer
+        </p>
+      )}
+
+      {eqError && (
+        <p className="text-xs text-destructive bg-destructive/10 border border-destructive/30 px-3 py-2 rounded-lg">
+          {eqError}
         </p>
       )}
 

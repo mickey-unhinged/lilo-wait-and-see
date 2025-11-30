@@ -3,6 +3,7 @@ import { HeroSection } from "@/components/home/HeroSection";
 import { QuickAccessGrid } from "@/components/home/QuickAccessGrid";
 import { RecentlyPlayedSection } from "@/components/home/RecentlyPlayedSection";
 import { ForYouSection } from "@/components/home/ForYouSection";
+import { DailyMixSection } from "@/components/home/DailyMixSection";
 import { TrendingSection } from "@/components/home/TrendingSection";
 import { TopArtistsSection } from "@/components/home/TopArtistsSection";
 import { Watermark } from "@/components/common/Watermark";
@@ -15,6 +16,7 @@ const Index = () => {
       <QuickAccessGrid />
       <RecentlyPlayedSection />
       <ForYouSection />
+      <DailyMixSection />
       <FriendsActivity />
       <TrendingSection />
       <TopArtistsSection />

@@ -97,11 +97,32 @@ export function SearchResults({ results, isLoading }: SearchResultsProps) {
             </div>
 
             {/* Album art */}
-            <img
-              src={track.cover_url || track.album_cover || "https://images.unsplash.com/photo-1614149162883-504ce4d13909?w=100&h=100&fit=crop"}
-              alt={track.title}
-              className="w-12 h-12 rounded-lg object-cover"
-            />
+            <div className="w-12 h-12 rounded-lg overflow-hidden bg-card flex-shrink-0">
+              {(() => {
+                const coverUrl = track.cover_url || track.album_cover;
+                const fallbackUrl = "https://images.unsplash.com/photo-1614149162883-504ce4d13909?w=100&h=100&fit=crop";
+                
+                if (!coverUrl) {
+                  console.warn(`Track "${track.title}" missing cover - cover_url: ${track.cover_url}, album_cover: ${track.album_cover}`);
+                }
+                
+                return (
+                  <img
+                    src={coverUrl || fallbackUrl}
+                    alt={track.title}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      if (target.src !== fallbackUrl) {
+                        console.error(`Image failed to load: ${target.src}, falling back to default`);
+                        target.src = fallbackUrl;
+                      }
+                    }}
+                  />
+                );
+              })()}
+            </div>
 
             {/* Track info */}
             <div className="flex-1 min-w-0 text-left">
@@ -125,7 +146,7 @@ export function SearchResults({ results, isLoading }: SearchResultsProps) {
             {/* Source badge */}
             {track.id.startsWith("ytm-") ? (
               <span className="px-2 py-0.5 text-[10px] font-medium bg-red-500/20 text-red-400 rounded-full">
-                YT Music
+                Live
               </span>
             ) : track.id.startsWith("itunes-") ? (
               <span className="px-2 py-0.5 text-[10px] font-medium bg-secondary/50 rounded-full">

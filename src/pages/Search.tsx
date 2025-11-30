@@ -2,14 +2,15 @@ import { useState, useEffect } from "react";
 import { Search as SearchIcon, X, Mic, TrendingUp, Music } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { SearchResults } from "@/components/search/SearchResults";
-import { useYouTubeMusicSearch } from "@/hooks/useYouTubeMusicSearch";
+import { useLiveVideoSearch } from "@/hooks/useLiveVideoSearch";
 import { useMusicSearch } from "@/hooks/useMusicSearch";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/useDebounce";
 import { Watermark } from "@/components/common/Watermark";
 import type { Track } from "@/contexts/PlayerContext";
+import { useVoiceSearch } from "@/hooks/useVoiceSearch";
 
-type SearchSource = "youtube" | "itunes";
+type SearchSource = "live" | "itunes";
 
 const genres = [
   { id: "1", name: "Pop", color: "from-pink-500 to-rose-500" },
@@ -47,28 +48,40 @@ const trendingSearches = [
 const Search = () => {
   const [query, setQuery] = useState("");
   const [isFocused, setIsFocused] = useState(false);
-  const [searchSource, setSearchSource] = useState<SearchSource>("youtube");
+  const [searchSource, setSearchSource] = useState<SearchSource>("live");
   const debouncedQuery = useDebounce(query, 400);
   
-  const ytMusic = useYouTubeMusicSearch();
+  const liveVideo = useLiveVideoSearch();
   const iTunes = useMusicSearch();
+  const { results: liveResults, isLoading: liveLoading, searchMusic: searchLive, clearResults: clearLive } = liveVideo;
+  const { results: itunesResults, isLoading: itunesLoading, searchMusic: searchItunes, clearResults: clearItunes } = iTunes;
+  const {
+    isSupported: micSupported,
+    isListening,
+    error: micError,
+    startListening,
+    stopListening,
+  } = useVoiceSearch((spokenText) => {
+    setQuery(spokenText);
+    setIsFocused(true);
+  });
   
-  const results: Track[] = searchSource === "youtube" ? ytMusic.results : iTunes.results;
-  const isLoading = searchSource === "youtube" ? ytMusic.isLoading : iTunes.isLoading;
+  const results: Track[] = searchSource === "live" ? liveResults : itunesResults;
+  const isLoading = searchSource === "live" ? liveLoading : itunesLoading;
 
   // Search when debounced query changes
   useEffect(() => {
     if (debouncedQuery.trim()) {
-      if (searchSource === "youtube") {
-        ytMusic.searchMusic(debouncedQuery);
+      if (searchSource === "live") {
+        searchLive(debouncedQuery);
       } else {
-        iTunes.searchMusic(debouncedQuery);
+        searchItunes(debouncedQuery);
       }
     } else {
-      ytMusic.clearResults();
-      iTunes.clearResults();
+      clearLive();
+      clearItunes();
     }
-  }, [debouncedQuery, searchSource]);
+  }, [debouncedQuery, searchSource, searchLive, searchItunes, clearLive, clearItunes]);
 
   const handleGenreClick = (genreName: string) => {
     setQuery(genreName);
@@ -114,32 +127,61 @@ const Search = () => {
             <button
               onClick={() => {
                 setQuery("");
-                ytMusic.clearResults();
-                iTunes.clearResults();
+                clearLive();
+                clearItunes();
               }}
               className="p-1"
             >
               <X className="w-5 h-5 text-muted-foreground hover:text-foreground transition-colors" />
             </button>
           ) : (
-            <button className="p-1">
-              <Mic className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />
+            <button
+              className={cn(
+                "p-1 rounded-full transition-colors",
+                !micSupported && "opacity-40 cursor-not-allowed",
+                isListening && "bg-primary/10 text-primary"
+              )}
+              onClick={() => {
+                if (!micSupported) return;
+                if (isListening) {
+                  stopListening();
+                } else {
+                  startListening();
+                }
+              }}
+              type="button"
+            >
+              <Mic
+                className={cn(
+                  "w-5 h-5",
+                  isListening ? "text-primary" : "text-muted-foreground hover:text-primary"
+                )}
+              />
             </button>
           )}
         </div>
+        {micError ? (
+          <p className="text-xs text-destructive mt-2 px-1">{micError}</p>
+        ) : (
+          !micSupported && (
+            <p className="text-xs text-muted-foreground mt-2 px-1">
+              Voice search isn't supported in this browser.
+            </p>
+          )
+        )}
 
         {/* Source Toggle */}
         <div className="flex items-center justify-center gap-2 mt-3">
           <button
-            onClick={() => setSearchSource("youtube")}
+            onClick={() => setSearchSource("live")}
             className={cn(
               "px-4 py-1.5 rounded-full text-xs font-medium transition-all",
-              searchSource === "youtube"
+              searchSource === "live"
                 ? "bg-primary text-primary-foreground"
                 : "bg-card text-muted-foreground hover:text-foreground"
             )}
           >
-            YouTube Music
+            Lilo Live
           </button>
           <button
             onClick={() => setSearchSource("itunes")}

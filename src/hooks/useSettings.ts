@@ -5,6 +5,8 @@ interface Settings {
   highQualityAudio: boolean;
   crossfade: boolean;
   gaplessPlayback: boolean;
+  crossfadeDuration: number; // seconds
+  volumeNormalization: boolean;
   
   // Notifications
   pushNotifications: boolean;
@@ -23,6 +25,8 @@ const defaultSettings: Settings = {
   highQualityAudio: false,
   crossfade: false,
   gaplessPlayback: true,
+  crossfadeDuration: 2,
+  volumeNormalization: false,
   pushNotifications: true,
   emailUpdates: false,
   personalizedRecommendations: true,
