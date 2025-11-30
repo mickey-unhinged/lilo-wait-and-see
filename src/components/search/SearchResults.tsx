@@ -15,7 +15,7 @@ function formatDuration(ms: number): string {
 }
 
 export function SearchResults({ results, isLoading }: SearchResultsProps) {
-  const { currentTrack, isPlaying, playTrack, toggle, setQueue } = usePlayer();
+  const { currentTrack, isPlaying, playTrack, toggle } = usePlayer();
 
   if (isLoading) {
     return (
@@ -37,12 +37,13 @@ export function SearchResults({ results, isLoading }: SearchResultsProps) {
     return null;
   }
 
-  const handlePlay = (track: Track) => {
+const handlePlay = async (track: Track) => {
     if (currentTrack?.id === track.id) {
       toggle();
     } else {
-      setQueue(results);
-      playTrack(track, results);
+      // Don't add all search results to queue - instead play the track
+      // and let autoplay fetch similar tracks when this one ends
+      playTrack(track, [track]);
     }
   };
 

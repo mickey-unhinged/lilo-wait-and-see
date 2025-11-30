@@ -223,6 +223,42 @@ export type Database = {
         }
         Relationships: []
       }
+      listening_rooms: {
+        Row: {
+          created_at: string
+          current_track: Json | null
+          description: string | null
+          host_id: string
+          id: string
+          is_playing: boolean | null
+          name: string
+          playback_position: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_track?: Json | null
+          description?: string | null
+          host_id: string
+          id?: string
+          is_playing?: boolean | null
+          name: string
+          playback_position?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_track?: Json | null
+          description?: string | null
+          host_id?: string
+          id?: string
+          is_playing?: boolean | null
+          name?: string
+          playback_position?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       play_history: {
         Row: {
           completed: boolean | null
@@ -413,6 +449,67 @@ export type Database = {
           username?: string | null
         }
         Relationships: []
+      }
+      room_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          reaction: string | null
+          room_id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          reaction?: string | null
+          room_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          reaction?: string | null
+          room_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_messages_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "listening_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      room_participants: {
+        Row: {
+          joined_at: string
+          room_id: string
+          user_id: string
+        }
+        Insert: {
+          joined_at?: string
+          room_id: string
+          user_id: string
+        }
+        Update: {
+          joined_at?: string
+          room_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_participants_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "listening_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       shared_songs: {
         Row: {
