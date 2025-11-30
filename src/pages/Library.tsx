@@ -114,7 +114,13 @@ const Library = () => {
   };
 
   const handleCreatePlaylist = async () => {
-    if (!currentUserId || !newPlaylistTitle.trim()) {
+    if (!currentUserId) {
+      toast({ title: "Please sign in to create playlists", variant: "destructive" });
+      return;
+    }
+    
+    const trimmedTitle = newPlaylistTitle.trim();
+    if (!trimmedTitle) {
       toast({ title: "Please enter a playlist name", variant: "destructive" });
       return;
     }

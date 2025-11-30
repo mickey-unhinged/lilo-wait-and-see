@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Loader2, UserMinus, UserPlus } from "lucide-react";
+import { Loader2, UserMinus, UserPlus, BarChart3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { FriendStatsSheet } from "./FriendStatsSheet";
 
 interface User {
   id: string;
@@ -177,20 +178,25 @@ export function FollowersSheet({ userId, type, count, children }: FollowersSheet
                 key={user.id}
                 className="flex items-center justify-between p-3 rounded-xl bg-card/50"
               >
-                <div className="flex items-center gap-3">
-                  <Avatar className="w-12 h-12">
-                    <AvatarImage src={user.avatar_url || undefined} />
-                    <AvatarFallback>
-                      {(user.display_name || user.username || "U")[0].toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium">{user.display_name || user.username || "User"}</p>
-                    {user.username && (
-                      <p className="text-sm text-muted-foreground">@{user.username}</p>
-                    )}
-                  </div>
-                </div>
+                <FriendStatsSheet friendId={user.id}>
+                  <button className="flex items-center gap-3 text-left hover:opacity-80 transition-opacity">
+                    <Avatar className="w-12 h-12">
+                      <AvatarImage src={user.avatar_url || undefined} />
+                      <AvatarFallback>
+                        {(user.display_name || user.username || "U")[0].toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium flex items-center gap-1">
+                        {user.display_name || user.username || "User"}
+                        <BarChart3 className="w-3 h-3 text-muted-foreground" />
+                      </p>
+                      {user.username && (
+                        <p className="text-sm text-muted-foreground">@{user.username}</p>
+                      )}
+                    </div>
+                  </button>
+                </FriendStatsSheet>
                 
                 {currentUserId && currentUserId !== user.id && (
                   <Button

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, ChevronRight, LogOut, Moon, Bell, Shield, HelpCircle, Music, User, Sun, Volume2, Info, Mail, MessageSquare, Bug, ExternalLink, Users, Sliders, Inbox } from "lucide-react";
+import { Settings, ChevronRight, LogOut, Moon, Bell, Shield, HelpCircle, Music, User, Sun, Volume2, Info, Mail, MessageSquare, Bug, ExternalLink, Users, Sliders, Inbox, BarChart3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -17,6 +17,7 @@ import { AvatarUpload } from "@/components/profile/AvatarUpload";
 import { Equalizer } from "@/components/settings/Equalizer";
 import { FollowersSheet } from "@/components/profile/FollowersSheet";
 import { InboxSheet } from "@/components/inbox/InboxSheet";
+import { ListeningStats } from "@/components/profile/ListeningStats";
 
 const Profile = () => {
   const [user, setUser] = useState<any>(null);
@@ -511,6 +512,17 @@ const Profile = () => {
               <ChevronRight className="w-5 h-5 text-muted-foreground" />
             </button>
           </UserSearchSheet>
+        )}
+
+        {/* Listening Stats */}
+        {user && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <BarChart3 className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-bold">Your Listening Stats</h2>
+            </div>
+            <ListeningStats userId={user.id} userName={displayUser.name} isOwnProfile />
+          </div>
         )}
         
         {/* Menu items */}
