@@ -3,7 +3,6 @@ import { Users, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
-import type { RealtimePostgresInsertPayload } from "@supabase/supabase-js";
 
 interface Activity {
   user_id: string;
@@ -17,22 +16,6 @@ interface Activity {
     display_name: string | null;
     avatar_url: string | null;
   };
-}
-
-interface ListeningRow {
-  user_id: string;
-  track_title: string;
-  track_artist: string | null;
-  track_cover: string | null;
-  track_source?: string | null;
-  played_at: string;
-}
-
-interface ProfileRow {
-  id: string;
-  username: string | null;
-  display_name: string | null;
-  avatar_url: string | null;
 }
 
 export function FriendsActivity() {
@@ -57,36 +40,33 @@ export function FriendsActivity() {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
-        .from<ListeningRow>("listening_activity")
-        .select(`
-          user_id,
-          track_id,
-          track_title,
-          track_artist,
-          track_cover,
-          track_source,
-          played_at
-        `)
+        .from("listening_activity")
+        .select("user_id, track_id, track_title, track_artist, track_cover, track_source, played_at")
         .in("user_id", followingIds)
         .order("played_at", { ascending: false })
         .limit(20);
 
       if (error) throw error;
-      const userIds = (data || []).map((row) => row.user_id);
+      
+      const rows = data || [];
+      const userIds = rows.map((row: any) => row.user_id);
+      
       const { data: profiles } = await supabase
-        .from<ProfileRow>("profiles")
+        .from("profiles")
         .select("id, username, display_name, avatar_url")
         .in("id", userIds);
 
+      const profilesData = profiles || [];
+      
       setActivities(
-        (data || []).map((row) => ({
+        rows.map((row: any) => ({
           user_id: row.user_id,
           track_title: row.track_title,
           track_artist: row.track_artist || "Unknown Artist",
           track_cover: row.track_cover,
           track_source: row.track_source,
           played_at: row.played_at,
-          profile: profiles?.find((profile) => profile.id === row.user_id),
+          profile: profilesData.find((profile: any) => profile.id === row.user_id),
         }))
       );
     } catch (error) {
@@ -132,13 +112,13 @@ export function FriendsActivity() {
     const channel = supabase
       .channel("listening-activity-feed")
       .on(
-        "postgres_changes",
+        "postgres_changes" as any,
         {
           event: "INSERT",
           schema: "public",
           table: "listening_activity",
         },
-        (payload: RealtimePostgresInsertPayload<ListeningRow>) => {
+        (payload: any) => {
           const newUserId = payload.new?.user_id;
           if (newUserId && followedIds.includes(newUserId)) {
             fetchFriendsActivity(followedIds);
@@ -146,13 +126,13 @@ export function FriendsActivity() {
         }
       )
       .on(
-        "postgres_changes",
+        "postgres_changes" as any,
         {
           event: "UPDATE",
           schema: "public",
           table: "listening_activity",
         },
-        (payload: RealtimePostgresInsertPayload<ListeningRow>) => {
+        (payload: any) => {
           const updatedUserId = payload.new?.user_id;
           if (updatedUserId && followedIds.includes(updatedUserId)) {
             fetchFriendsActivity(followedIds);

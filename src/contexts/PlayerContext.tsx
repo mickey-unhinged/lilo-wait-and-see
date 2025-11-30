@@ -198,28 +198,31 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     audioRef.current = new Audio();
     audioRef.current.crossOrigin = "anonymous";
     audioRef.current.volume = 0.8;
-    audioRef.current.muted = false; // Ensure not muted initially
+    audioRef.current.muted = false; // CRITICAL: Never mute the element
     
-    // Attach to audio effects
-    audioEffects.attachAudioElement(audioRef.current);
+    // Don't attach to Web Audio API immediately - let it be optional
+    // This ensures audio will always play through the element directly
     
-    // Wait a bit to check if Web Audio API is actually working
-    setTimeout(() => {
+    const audio = audioRef.current;
+    
+    // Attach to audio effects after a short delay (non-blocking)
+    const attachTimeout = setTimeout(() => {
       if (audioRef.current) {
-        const isActive = audioEffects.isActive();
-        console.log("Audio initialization - Web Audio API active:", isActive);
-        if (!isActive) {
-          // If Web Audio API is not active, ensure element is not muted
+        try {
+          audioEffects.attachAudioElement(audioRef.current);
+          audioEffects.setMasterVolume(0.8);
+          audioEffects.resume();
+          // ALWAYS ensure element is not muted after attaching
           audioRef.current.muted = false;
-          console.log("Web Audio API not active, ensuring audio element is not muted");
+        } catch (e) {
+          console.warn("Web Audio API failed, using direct playback:", e);
+          if (audioRef.current) {
+            audioRef.current.muted = false;
+          }
         }
       }
     }, 100);
     
-    audioEffects.setMasterVolume(0.8);
-    audioEffects.resume();
-    
-    const audio = audioRef.current;
     const handleTimeUpdate = () => {
       setState(prev => {
         const newState = {
@@ -282,6 +285,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     audio.addEventListener("canplay", handleCanPlay);
     
     return () => {
+      clearTimeout(attachTimeout);
       audio.removeEventListener("timeupdate", handleTimeUpdate);
       audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
       audio.removeEventListener("ended", handleEnded);
@@ -301,11 +305,8 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     // Also ensure direct element volume is set as backup
     audioRef.current.volume = state.volume;
     
-    // Only keep muted if Web Audio API is actually working and connected
-    const isActive = audioEffects.isActive();
-    if (!isActive) {
-      audioRef.current.muted = false;
-    }
+    // CRITICAL: Never mute the audio element
+    audioRef.current.muted = false;
   }, [state.volume]);
 
   useEffect(() => {
@@ -394,15 +395,12 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
       return;
     }
     
-    // Ensure audio context is resumed
-    await audioEffects.resume();
+    // CRITICAL: Always ensure audio is not muted
+    audio.muted = false;
+    audio.volume = state.volume;
     
-    // CRITICAL: Always ensure audio is not muted unless Web Audio API is confirmed active
-    const isAudioEffectsActive = audioEffects.isActive();
-    if (!isAudioEffectsActive) {
-      audio.muted = false;
-      console.log("Web Audio API not active, using direct playback");
-    }
+    // Try to resume audio context (non-blocking)
+    audioEffects.resume().catch(() => {});
     
     const shouldCrossfade = Boolean(
       track &&
@@ -417,7 +415,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     }
     
     if (track) {
-      console.log("Playing track:", track.title, "audio_url:", track.audio_url);
+      console.log("Playing track:", track.title);
       setState(prev => ({ ...prev, currentTrack: track, isLoading: true }));
       logListeningActivity(track);
       
@@ -442,13 +440,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         }
       }
       
-      // Use demo audio as fallback
-      if (!audioUrl) {
-        console.warn("No audio URL for track, using fallback:", track.title);
-        audioUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
-      }
-      
-      // Validate audio URL
+      // No fallback to demo audio - if no URL, just fail gracefully
       if (!audioUrl || audioUrl.trim() === "") {
         console.error("No valid audio URL for track:", track.title);
         setState(prev => ({ ...prev, isLoading: false, isPlaying: false }));
@@ -461,47 +453,28 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
       
       // Wait for audio to be ready before playing
       const playAudio = () => {
-        console.log("Attempting to play audio. Muted:", audio.muted, "Volume:", audio.volume, "Web Audio Active:", isAudioEffectsActive);
+        // CRITICAL: Always unmute and set volume before playing
+        audio.muted = false;
+        audio.volume = settings.crossfade && crossfadeDuration > 0 ? 0 : state.volume;
         
-        // CRITICAL: Set volume and unmute before playing
-        if (isAudioEffectsActive) {
-          // Use Web Audio API
-          if (settings.crossfade && crossfadeDuration > 0 && track) {
-            audioEffects.setMasterVolume(0);
-          } else {
-            audioEffects.setMasterVolume(state.volume);
-          }
-        } else {
-          // Direct playback - ensure not muted and volume is set
-          audio.muted = false;
-          if (settings.crossfade && crossfadeDuration > 0 && track) {
-            audio.volume = 0;
-          } else {
-            audio.volume = state.volume;
-          }
-        }
-        
-        console.log("Before play - muted:", audio.muted, "volume:", audio.volume, "src:", audio.src);
+        console.log("Playing - muted:", audio.muted, "volume:", audio.volume);
         
         audio.play().then(() => {
           console.log("Audio play() succeeded");
-          setState(prev => ({ ...prev, isPlaying: true }));
-          if (settings.crossfade && crossfadeDuration > 0 && track) {
+          setState(prev => ({ ...prev, isPlaying: true, isLoading: false }));
+          if (settings.crossfade && crossfadeDuration > 0) {
             audioEffects.fadeTo(state.volume, crossfadeDuration / 2, audio);
           }
         }).catch(err => {
           console.error("Playback error:", err);
-          setState(prev => ({ ...prev, isPlaying: false, isLoading: false }));
-          
-          // Fallback: Force unmute and try again
-          console.log("Attempting fallback playback");
+          // Retry once with explicit unmute
           audio.muted = false;
           audio.volume = state.volume;
           audio.play().then(() => {
-            console.log("Fallback playback succeeded");
-            setState(prev => ({ ...prev, isPlaying: true }));
-          }).catch(fallbackErr => {
-            console.error("Fallback playback also failed:", fallbackErr);
+            setState(prev => ({ ...prev, isPlaying: true, isLoading: false }));
+          }).catch(retryErr => {
+            console.error("Retry playback failed:", retryErr);
+            setState(prev => ({ ...prev, isPlaying: false, isLoading: false }));
           });
         });
       };
@@ -510,34 +483,21 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
       if (audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
         playAudio();
       } else {
-        const handleCanPlayThrough = () => {
-          playAudio();
-          audio.removeEventListener("canplaythrough", handleCanPlayThrough);
-        };
         const handleCanPlay = () => {
           playAudio();
           audio.removeEventListener("canplay", handleCanPlay);
         };
-        audio.addEventListener("canplaythrough", handleCanPlayThrough);
         audio.addEventListener("canplay", handleCanPlay);
         // Fallback timeout
         setTimeout(() => {
-          audio.removeEventListener("canplaythrough", handleCanPlayThrough);
           audio.removeEventListener("canplay", handleCanPlay);
-          if (audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-            playAudio();
-          } else {
-            console.warn("Audio not ready after timeout, attempting to play anyway");
-            playAudio();
-          }
-        }, 5000);
+          playAudio();
+        }, 3000);
       }
     } else {
       // Resume playing current track
-      // Ensure not muted
-      if (!isAudioEffectsActive) {
-        audio.muted = false;
-      }
+      audio.muted = false;
+      audio.volume = state.volume;
       audio.play().then(() => {
         setState(prev => ({ ...prev, isPlaying: true }));
       }).catch(err => {

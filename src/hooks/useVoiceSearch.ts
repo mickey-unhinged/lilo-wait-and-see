@@ -1,8 +1,48 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
+// Web Speech API type definitions
+interface SpeechRecognitionResultItem {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognitionResult {
+  [index: number]: SpeechRecognitionResultItem;
+  length: number;
+  isFinal: boolean;
+}
+
+interface SpeechRecognitionResultList {
+  [index: number]: SpeechRecognitionResult;
+  length: number;
+}
+
+interface SpeechRecognitionEventCustom extends Event {
+  results: SpeechRecognitionResultList;
+  resultIndex: number;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+  message?: string;
+}
+
+interface SpeechRecognitionInstance extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionEventCustom) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+}
+
 declare global {
   interface Window {
-    webkitSpeechRecognition?: typeof SpeechRecognition;
+    SpeechRecognition?: new () => SpeechRecognitionInstance;
+    webkitSpeechRecognition?: new () => SpeechRecognitionInstance;
   }
 }
 
@@ -10,7 +50,7 @@ export function useVoiceSearch(onTranscript: (text: string) => void) {
   const [isSupported, setIsSupported] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -27,14 +67,14 @@ export function useVoiceSearch(onTranscript: (text: string) => void) {
     recognition.interimResults = false;
     recognition.lang = "en-US";
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
+    recognition.onresult = (event: SpeechRecognitionEventCustom) => {
       const transcript = event.results?.[0]?.[0]?.transcript;
       if (transcript) {
         onTranscript(transcript);
       }
     };
 
-    recognition.onerror = (event) => {
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       setError(event.error === "not-allowed" ? "Microphone permission was denied" : "Voice search failed");
       setIsListening(false);
     };
@@ -43,7 +83,7 @@ export function useVoiceSearch(onTranscript: (text: string) => void) {
       setIsListening(false);
     };
 
-    recognitionRef.current = recognition as SpeechRecognition;
+    recognitionRef.current = recognition;
 
     return () => {
       recognition.stop();
@@ -80,4 +120,3 @@ export function useVoiceSearch(onTranscript: (text: string) => void) {
     stopListening,
   };
 }
-

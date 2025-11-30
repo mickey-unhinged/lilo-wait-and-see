@@ -193,6 +193,36 @@ export type Database = {
           },
         ]
       }
+      listening_activity: {
+        Row: {
+          played_at: string
+          track_artist: string | null
+          track_cover: string | null
+          track_id: string
+          track_source: string | null
+          track_title: string
+          user_id: string
+        }
+        Insert: {
+          played_at?: string
+          track_artist?: string | null
+          track_cover?: string | null
+          track_id: string
+          track_source?: string | null
+          track_title: string
+          user_id: string
+        }
+        Update: {
+          played_at?: string
+          track_artist?: string | null
+          track_cover?: string | null
+          track_id?: string
+          track_source?: string | null
+          track_title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       play_history: {
         Row: {
           completed: boolean | null

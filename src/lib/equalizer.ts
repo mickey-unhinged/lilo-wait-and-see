@@ -72,38 +72,47 @@ class AudioEffectsManager {
     if (!audioElement) return;
     if (this.connectedElement === audioElement && this.active) return;
 
+    // CRITICAL: Keep audio element unmuted by default for direct playback
+    audioElement.muted = false;
+    this.connectedElement = audioElement;
+
     try {
       const context = this.getContext();
       if (!context) {
-        // If context creation fails, ensure element is not muted
         console.warn("Audio context creation failed, using direct playback");
-        audioElement.muted = false;
+        this.active = false;
         return;
       }
 
+      // Only create source node once per element
       if (!this.sourceNode) {
-        this.sourceNode = context.createMediaElementSource(audioElement);
+        try {
+          this.sourceNode = context.createMediaElementSource(audioElement);
+        } catch (e) {
+          // Source already created for this element
+          console.warn("Source node already exists:", e);
+          this.active = false;
+          return;
+        }
       }
 
-      this.connectedElement = audioElement;
-      
-      // Build the audio graph first
+      // Build the audio graph
       this.buildGraph();
       
-      // Only mute if we successfully built the graph and it's connected
-      if (this.masterGain && this.sourceNode) {
-        this.connectedElement.muted = true;
+      // Verify the graph is properly connected before muting
+      if (this.masterGain && this.sourceNode && this.audioContext?.state === "running") {
+        // Keep unmuted - let audio flow through both paths for reliability
+        audioElement.muted = false;
         this.active = true;
-        console.log("Web Audio API graph connected, audio element muted");
+        console.log("Web Audio API graph connected");
       } else {
-        console.warn("Web Audio API graph not properly connected, keeping audio unmuted");
-        this.connectedElement.muted = false;
+        console.warn("Web Audio API graph not fully ready");
+        audioElement.muted = false;
         this.active = false;
       }
     } catch (error) {
       console.error("Audio effects failed to initialize:", error);
       this.active = false;
-      // Ensure element is not muted if Web Audio API fails
       audioElement.muted = false;
     }
   }

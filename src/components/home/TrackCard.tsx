@@ -33,8 +33,14 @@ export function TrackCard({
         <img
           src={imageUrl}
           alt={title}
+          loading="lazy"
+          onError={(e) => {
+            // Fallback to placeholder on error
+            const target = e.target as HTMLImageElement;
+            target.src = "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=200&h=200&fit=crop";
+          }}
           className={cn(
-            "object-cover rounded-2xl transition-all duration-300 group-hover:shadow-lg",
+            "object-cover rounded-2xl transition-all duration-300 group-hover:shadow-lg bg-card/50",
             isLarge ? "w-44 h-44" : "w-36 h-36"
           )}
         />
