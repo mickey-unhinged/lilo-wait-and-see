@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
-  Radio, Plus, Users, Music, Play, Crown, ArrowRight 
+  Radio, Plus, Users, Music, Play, Crown, ArrowRight, Lock, Globe, Search 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -20,6 +22,8 @@ interface Room {
   host_id: string;
   current_track: Track | null;
   is_playing: boolean;
+  is_private: boolean;
+  room_code: string | null;
   participant_count?: number;
 }
 
@@ -36,6 +40,8 @@ export function ListeningRoomsSheet({ trigger }: ListeningRoomsSheetProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [newRoomName, setNewRoomName] = useState("");
   const [newRoomDescription, setNewRoomDescription] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [roomCodeSearch, setRoomCodeSearch] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -117,6 +123,7 @@ export function ListeningRoomsSheet({ trigger }: ListeningRoomsSheetProps) {
           name: newRoomName.trim(),
           description: newRoomDescription.trim() || null,
           host_id: userId,
+          is_private: isPrivate,
         })
         .select()
         .single();
@@ -128,10 +135,34 @@ export function ListeningRoomsSheet({ trigger }: ListeningRoomsSheetProps) {
       setIsOpen(false);
       setNewRoomName("");
       setNewRoomDescription("");
+      setIsPrivate(false);
       navigate(`/room/${data.id}`);
     } catch (err) {
       console.error("Failed to create room:", err);
       toast({ title: "Failed to create room", variant: "destructive" });
+    }
+  };
+
+  const handleSearchRoomCode = async () => {
+    if (!roomCodeSearch.trim()) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("listening_rooms")
+        .select("id")
+        .eq("room_code", roomCodeSearch.trim().toUpperCase())
+        .single();
+
+      if (error || !data) {
+        toast({ title: "Room not found", description: "Check the code and try again", variant: "destructive" });
+        return;
+      }
+
+      setIsOpen(false);
+      setRoomCodeSearch("");
+      navigate(`/room/${data.id}`);
+    } catch (err) {
+      toast({ title: "Room not found", variant: "destructive" });
     }
   };
 
@@ -162,6 +193,21 @@ export function ListeningRoomsSheet({ trigger }: ListeningRoomsSheetProps) {
         </SheetHeader>
 
         <div className="py-4 space-y-4 overflow-y-auto max-h-[calc(85vh-120px)]">
+          {/* Join Private Room by Code */}
+          <div className="flex gap-2 mb-4">
+            <Input
+              value={roomCodeSearch}
+              onChange={(e) => setRoomCodeSearch(e.target.value.toUpperCase())}
+              placeholder="Enter room code..."
+              className="flex-1 font-mono tracking-wider"
+              maxLength={6}
+              onKeyDown={(e) => e.key === "Enter" && handleSearchRoomCode()}
+            />
+            <Button variant="secondary" onClick={handleSearchRoomCode}>
+              <Search className="w-4 h-4" />
+            </Button>
+          </div>
+
           {/* Create Room Button */}
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
@@ -191,6 +237,19 @@ export function ListeningRoomsSheet({ trigger }: ListeningRoomsSheetProps) {
                     value={newRoomDescription}
                     onChange={(e) => setNewRoomDescription(e.target.value)}
                     placeholder="What kind of music will you play?"
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="room-private">Private Room</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Only invited users can join
+                    </p>
+                  </div>
+                  <Switch
+                    id="room-private"
+                    checked={isPrivate}
+                    onCheckedChange={setIsPrivate}
                   />
                 </div>
                 <Button onClick={handleCreateRoom} className="w-full">
@@ -245,6 +304,9 @@ export function ListeningRoomsSheet({ trigger }: ListeningRoomsSheetProps) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="font-medium truncate">{room.name}</p>
+                        {room.is_private && (
+                          <Lock className="w-3 h-3 text-muted-foreground" />
+                        )}
                         {room.is_playing && (
                           <span className="flex items-center gap-1 text-xs text-primary">
                             <Play className="w-3 h-3" fill="currentColor" />

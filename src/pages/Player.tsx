@@ -6,10 +6,9 @@ import { Slider } from "@/components/ui/slider";
 import { usePlayer, Track } from "@/contexts/PlayerContext";
 import { demoTracks } from "@/hooks/useTracks";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LyricsPanel } from "@/components/player/LyricsPanel";
-import { VideoPreview } from "@/components/player/VideoPreview";
+import { SyncedVideoPlayer } from "@/components/player/SyncedVideoPlayer";
 import { useToast } from "@/hooks/use-toast";
 import { Watermark } from "@/components/common/Watermark";
 import { ShareToFriendsSheet } from "@/components/inbox/ShareToFriendsSheet";
@@ -52,6 +51,7 @@ const Player = () => {
   const { isLiked, toggleLike } = useLikedSongs();
   const [bars, setBars] = useState<number[]>(Array(40).fill(0.5));
   const [showLyrics, setShowLyrics] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
   const [showShareSheet, setShowShareSheet] = useState(false);
   const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
   const [isStartingRadio, setIsStartingRadio] = useState(false);
@@ -211,16 +211,16 @@ const Player = () => {
           </DropdownMenu>
         </header>
         
-        {/* Album art with visualizer and lyrics side by side */}
+        {/* Album art with visualizer, lyrics or video side by side */}
         <div className="flex-1 flex items-center justify-center px-4 py-6">
           <div className={cn(
             "flex items-center justify-center gap-4 w-full max-w-4xl transition-all duration-300",
-            showLyrics ? "flex-row" : "flex-col"
+            (showLyrics || showVideo) ? "flex-row" : "flex-col"
           )}>
             {/* Album art container */}
             <div className={cn(
               "relative transition-all duration-300",
-              showLyrics ? "w-48 h-48 md:w-64 md:h-64 flex-shrink-0" : "w-full max-w-sm aspect-square"
+              (showLyrics || showVideo) ? "w-48 h-48 md:w-64 md:h-64 flex-shrink-0" : "w-full max-w-sm aspect-square"
             )}>
               {/* Glow effect */}
               <div 
@@ -244,7 +244,7 @@ const Player = () => {
               />
               
               {/* Visualizer overlay */}
-              {isPlaying && !showLyrics && (
+              {isPlaying && !showLyrics && !showVideo && (
                 <div className="absolute inset-x-0 bottom-0 h-24 flex items-end justify-center gap-0.5 px-6 pb-4">
                   {bars.map((height, i) => (
                     <div
@@ -261,6 +261,13 @@ const Player = () => {
             {showLyrics && (
               <div className="flex-1 h-64 md:h-80 lg:h-96 min-w-0 bg-card/30 rounded-2xl backdrop-blur-sm border border-border/20 overflow-hidden">
                 <LyricsPanel title={track?.title} artist={track?.artist_name} />
+              </div>
+            )}
+
+            {/* Video panel - shown inline when active */}
+            {showVideo && (
+              <div className="flex-1 h-64 md:h-80 lg:h-96 min-w-0 bg-card/30 rounded-2xl backdrop-blur-sm border border-border/20 overflow-hidden p-4">
+                <SyncedVideoPlayer videoId={track?.videoId} title={track?.title} />
               </div>
             )}
           </div>
@@ -289,7 +296,10 @@ const Player = () => {
           {/* Lyrics & Video buttons */}
           <div className="flex items-center gap-2 mt-4">
             <button 
-              onClick={() => setShowLyrics(!showLyrics)}
+              onClick={() => {
+                setShowLyrics(!showLyrics);
+                if (!showLyrics) setShowVideo(false);
+              }}
               className={cn(
                 "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors",
                 showLyrics 
@@ -302,22 +312,21 @@ const Player = () => {
             </button>
             
             {track?.videoId && (
-              <Sheet>
-                <SheetTrigger asChild>
-                  <button className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/40 hover:bg-muted/60 text-sm font-medium transition-colors">
-                    <Video className="w-4 h-4" />
-                    Video
-                  </button>
-                </SheetTrigger>
-                <SheetContent side="bottom" className="h-[70vh] rounded-t-3xl">
-                  <SheetHeader className="pb-4">
-                    <SheetTitle className="text-center">Video</SheetTitle>
-                  </SheetHeader>
-                  <div className="h-[calc(100%-4rem)] px-4">
-                    <VideoPreview videoId={track?.videoId} title={track?.title} />
-                  </div>
-                </SheetContent>
-              </Sheet>
+              <button 
+                onClick={() => {
+                  setShowVideo(!showVideo);
+                  if (!showVideo) setShowLyrics(false);
+                }}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors",
+                  showVideo 
+                    ? "bg-primary text-primary-foreground" 
+                    : "bg-muted/40 hover:bg-muted/60"
+                )}
+              >
+                <Video className="w-4 h-4" />
+                Video
+              </button>
             )}
             
             <button 

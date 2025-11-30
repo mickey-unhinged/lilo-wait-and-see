@@ -231,8 +231,10 @@ export type Database = {
           host_id: string
           id: string
           is_playing: boolean | null
+          is_private: boolean
           name: string
           playback_position: number | null
+          room_code: string | null
           updated_at: string
         }
         Insert: {
@@ -242,8 +244,10 @@ export type Database = {
           host_id: string
           id?: string
           is_playing?: boolean | null
+          is_private?: boolean
           name: string
           playback_position?: number | null
+          room_code?: string | null
           updated_at?: string
         }
         Update: {
@@ -253,8 +257,10 @@ export type Database = {
           host_id?: string
           id?: string
           is_playing?: boolean | null
+          is_private?: boolean
           name?: string
           playback_position?: number | null
+          room_code?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -449,6 +455,38 @@ export type Database = {
           username?: string | null
         }
         Relationships: []
+      }
+      room_invites: {
+        Row: {
+          created_at: string
+          id: string
+          invited_by: string
+          invited_user_id: string
+          room_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invited_by: string
+          invited_user_id: string
+          room_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invited_by?: string
+          invited_user_id?: string
+          room_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_invites_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "listening_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       room_messages: {
         Row: {
@@ -675,6 +713,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_room_code: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

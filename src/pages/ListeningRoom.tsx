@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { 
   ArrowLeft, Users, Send, Music, Play, Pause, SkipForward, 
-  Crown, LogOut, Heart, Smile, ThumbsUp, Flame, Star
+  Crown, LogOut, Heart, Smile, ThumbsUp, Flame, Star, Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,8 @@ import { usePlayer, type Track } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Watermark } from "@/components/common/Watermark";
+import { RoomMusicSearch } from "@/components/rooms/RoomMusicSearch";
+import { RoomInviteSheet } from "@/components/rooms/RoomInviteSheet";
 
 interface Room {
   id: string;
@@ -21,6 +23,8 @@ interface Room {
   current_track: Track | null;
   is_playing: boolean;
   playback_position: number;
+  is_private: boolean;
+  room_code: string | null;
 }
 
 interface Participant {
@@ -347,19 +351,34 @@ export default function ListeningRoom() {
               {room.current_track?.artist_name || "Waiting for host..."}
             </p>
             {isHost && (
-              <div className="flex items-center gap-2 mt-2">
-                <Button
-                  size="sm"
-                  onClick={() => (room.is_playing ? pause() : play())}
-                >
-                  {room.is_playing ? (
-                    <Pause className="w-4 h-4" />
-                  ) : (
-                    <Play className="w-4 h-4" />
+              <div className="flex flex-col gap-2 mt-2">
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => (room.is_playing ? pause() : play())}
+                  >
+                    {room.is_playing ? (
+                      <Pause className="w-4 h-4" />
+                    ) : (
+                      <Play className="w-4 h-4" />
+                    )}
+                  </Button>
+                  <RoomMusicSearch onSelectTrack={(track) => playTrack(track)} />
+                  {room.is_private && (
+                    <RoomInviteSheet 
+                      roomId={room.id} 
+                      roomCode={room.room_code} 
+                      userId={userId!} 
+                    />
                   )}
-                </Button>
+                </div>
                 <span className="text-xs text-primary flex items-center gap-1">
                   <Crown className="w-3 h-3" /> Host controls
+                  {room.is_private && (
+                    <span className="ml-2 flex items-center gap-1 text-muted-foreground">
+                      <Lock className="w-3 h-3" /> Private Room
+                    </span>
+                  )}
                 </span>
               </div>
             )}
