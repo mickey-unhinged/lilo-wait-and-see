@@ -50,6 +50,7 @@ export function ListeningRoomsSheet({ trigger }: ListeningRoomsSheetProps) {
     });
   }, []);
 
+  // Fetch rooms only on initial open
   useEffect(() => {
     if (!isOpen) return;
 
@@ -89,14 +90,48 @@ export function ListeningRoomsSheet({ trigger }: ListeningRoomsSheetProps) {
     };
 
     fetchRooms();
+  }, [isOpen]);
 
-    // Subscribe to room changes
+  // Subscribe to room changes with stable updates (no blinking)
+  useEffect(() => {
+    if (!isOpen) return;
+
     const channel = supabase
-      .channel("rooms-list")
+      .channel("rooms-list-updates")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "listening_rooms" },
-        () => fetchRooms()
+        { event: "UPDATE", schema: "public", table: "listening_rooms" },
+        (payload) => {
+          // Update the specific room in state without refetching all
+          setRooms(prev => prev.map(room => 
+            room.id === payload.new.id 
+              ? { 
+                  ...room, 
+                  ...payload.new,
+                  current_track: payload.new.current_track as unknown as Track | null,
+                }
+              : room
+          ));
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "listening_rooms" },
+        async (payload) => {
+          const newRoom = {
+            ...payload.new,
+            current_track: payload.new.current_track as unknown as Track | null,
+            participant_count: 1,
+          } as Room;
+          setRooms(prev => [newRoom, ...prev]);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "listening_rooms" },
+        (payload) => {
+          setRooms(prev => prev.filter(room => room.id !== payload.old.id));
+        }
       )
       .subscribe();
 
