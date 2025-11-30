@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Play, Plus, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -35,10 +35,12 @@ export function RoomMusicSearch({ onSelectTrack }: RoomMusicSearchProps) {
 
       if (error) throw error;
 
-      const tracks: Track[] = (data?.results || []).map((item: any) => ({
+      // Handle both response formats (tracks or results)
+      const items = data?.tracks || data?.results || [];
+      const tracks: Track[] = items.map((item: any) => ({
         id: item.videoId || item.id,
         title: item.title || item.name,
-        artist_name: item.artist || item.artist_name || "Unknown Artist",
+        artist_name: item.artists?.[0]?.name || item.artist || item.artist_name || "Unknown Artist",
         album_title: item.album || item.album_title || "",
         cover_url: item.thumbnail || item.cover_url,
         album_cover: item.thumbnail || item.cover_url,
@@ -57,9 +59,9 @@ export function RoomMusicSearch({ onSelectTrack }: RoomMusicSearchProps) {
   };
 
   // Search when debounced query changes
-  useState(() => {
+  useEffect(() => {
     if (debouncedQuery) handleSearch();
-  });
+  }, [debouncedQuery]);
 
   const handleSelect = (track: Track) => {
     onSelectTrack(track);
