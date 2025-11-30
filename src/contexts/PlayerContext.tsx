@@ -251,7 +251,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
       }));
     };
     
-    const handleEnded = () => {
+const handleEnded = () => {
       const gapless = settingsRef.current.gaplessPlayback;
       setState(prev => {
         if (prev.repeatMode === "one") {
@@ -259,15 +259,56 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
           audio.play();
           return prev;
         }
-        if (prev.queue.length > 0) {
+        
+        const currentIndex = prev.queue.findIndex(t => t.id === prev.currentTrack?.id);
+        const hasMoreInQueue = currentIndex < prev.queue.length - 1;
+        
+        if (hasMoreInQueue || (prev.repeatMode === "all" && prev.queue.length > 0)) {
           if (gapless) {
             nextRef.current();
             return prev;
           }
           setTimeout(() => nextRef.current(), 0);
+          return prev;
         }
+        
+        // Queue ended - trigger autoplay to fetch similar tracks
+        if (prev.currentTrack && prev.repeatMode !== "all") {
+          setTimeout(() => {
+            fetchAutoplayTracks(prev.currentTrack!);
+          }, 100);
+        }
+        
         return { ...prev, isPlaying: false };
       });
+    };
+    
+    // Autoplay function to fetch and play similar tracks
+    const fetchAutoplayTracks = async (currentTrack: Track) => {
+      try {
+        console.log("Fetching autoplay tracks for:", currentTrack.title);
+        const { data, error } = await supabase.functions.invoke("trending-suggestions", {
+          body: {
+            type: "autoplay",
+            seedArtists: [currentTrack.artist_name],
+            currentTrackId: currentTrack.id,
+            limit: 15,
+          },
+        });
+        
+        if (error) throw error;
+        
+        const tracks = (data?.tracks || []).filter((t: Track) => t.id !== currentTrack.id);
+        
+        if (tracks.length > 0) {
+          console.log("Autoplay: adding", tracks.length, "similar tracks to queue");
+          setState(prev => ({ ...prev, queue: [...prev.queue, ...tracks] }));
+          // Play the first new track
+          setTimeout(() => nextRef.current(), 100);
+        }
+      } catch (err) {
+        console.error("Autoplay failed:", err);
+      }
     };
     
     const handleError = (e: Event) => {

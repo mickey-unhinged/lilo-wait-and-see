@@ -238,14 +238,96 @@ serve(async (req) => {
       // No body provided, use defaults
     }
 
-    const { type, mood, seedArtists, seedGenres, searchTerms, limit = 20 } = body;
+    const { type, mood, seedArtists, seedGenres, searchTerms, weekSeed, currentTrackId, limit = 20 } = body;
 
     console.log("Fetching suggestions...", { type, mood, seedArtists, searchTerms });
 
     let tracks: Track[] = [];
     const hourSeed = Math.floor(Date.now() / (1000 * 60 * 60)); // Changes every hour
 
-    if (type === "mood" && mood && MOOD_QUERIES[mood]) {
+    if (type === "autoplay" && seedArtists?.length > 0) {
+      // Autoplay: fetch similar tracks based on current artist
+      const queries = [
+        `${seedArtists[0]} similar songs`,
+        `songs like ${seedArtists[0]}`,
+        `${seedArtists[0]} top songs`,
+        "popular music 2024",
+      ];
+      
+      const shuffledQueries = seededShuffle(queries, hourSeed);
+      const allTracks: Track[] = [];
+      
+      for (const query of shuffledQueries.slice(0, 3)) {
+        const results = await searchInvidious(query);
+        allTracks.push(...results);
+      }
+      
+      // Dedupe and filter out current track
+      const seen = new Set<string>();
+      if (currentTrackId) seen.add(currentTrackId);
+      
+      tracks = allTracks.filter(t => {
+        if (seen.has(t.id)) return false;
+        seen.add(t.id);
+        return true;
+      });
+      
+      tracks = seededShuffle(tracks, hourSeed).slice(0, limit);
+      
+      // Add fallback if not enough
+      if (tracks.length < 5) {
+        const fallback = getFallbackTracks();
+        for (const t of fallback) {
+          if (!seen.has(t.id)) {
+            tracks.push(t);
+            if (tracks.length >= limit) break;
+          }
+        }
+      }
+    } else if (type === "discover-weekly") {
+      // Discover Weekly: personalized weekly playlist
+      const weeklySeed = weekSeed || Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
+      
+      const queries: string[] = [];
+      
+      // Add user's favorite artists
+      if (seedArtists?.length > 0) {
+        queries.push(...seedArtists.slice(0, 3).map((a: string) => `${a} best songs`));
+        queries.push(...seedArtists.slice(0, 2).map((a: string) => `artists similar to ${a}`));
+      }
+      
+      // Add discovery queries
+      queries.push("new music 2024", "trending songs", "best new songs", "viral hits");
+      
+      const shuffledQueries = seededShuffle(queries, weeklySeed);
+      const allTracks: Track[] = [];
+      
+      for (const query of shuffledQueries.slice(0, 4)) {
+        const results = await searchInvidious(query);
+        allTracks.push(...results);
+      }
+      
+      // Dedupe and shuffle
+      const seen = new Set<string>();
+      tracks = allTracks.filter(t => {
+        if (seen.has(t.id)) return false;
+        seen.add(t.id);
+        return true;
+      });
+      
+      tracks = seededShuffle(tracks, weeklySeed).slice(0, limit);
+      
+      // Add fallback if not enough
+      if (tracks.length < limit / 2) {
+        const fallback = getFallbackTracks();
+        for (const t of seededShuffle(fallback, weeklySeed)) {
+          if (!seen.has(t.id)) {
+            tracks.push(t);
+            if (tracks.length >= limit) break;
+          }
+        }
+      }
+    } else if (type === "mood" && mood && MOOD_QUERIES[mood]) {
       // Mood-based playlist generation
       const queries = MOOD_QUERIES[mood];
       const shuffledQueries = seededShuffle(queries, hourSeed);
