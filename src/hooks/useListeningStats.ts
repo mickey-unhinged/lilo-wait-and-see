@@ -79,10 +79,12 @@ export function useListeningStats(userId: string | undefined, period: Period = "
       if (error) throw error;
 
       // Also get data from localStorage for more complete history
+      // localStorage format is { track: Track, playedAt: string }[]
       const localHistory = JSON.parse(localStorage.getItem("lilo-play-history") || "[]");
       const filteredLocalHistory = localHistory.filter((item: any) => {
-        if (!item.playedAt) return period === "allTime";
-        const playedDate = new Date(item.playedAt);
+        const playedAt = item.playedAt || item.played_at;
+        if (!playedAt) return period === "allTime";
+        const playedDate = new Date(playedAt);
         return playedDate >= startDate;
       });
 
@@ -95,13 +97,17 @@ export function useListeningStats(userId: string | undefined, period: Period = "
           cover: item.track_cover,
           playedAt: item.played_at,
         })),
-        ...filteredLocalHistory.map((item: any) => ({
-          trackId: item.id || item.trackId,
-          title: item.title,
-          artist: item.artist || "Unknown Artist",
-          cover: item.thumbnail || item.cover,
-          playedAt: item.playedAt,
-        })),
+        ...filteredLocalHistory.map((entry: any) => {
+          // Handle both formats: { track: Track, playedAt } and flat format
+          const track = entry.track || entry;
+          return {
+            trackId: track.id || track.trackId || entry.id,
+            title: track.title || entry.title,
+            artist: track.artist_name || track.artist || entry.artist_name || entry.artist || "Unknown Artist",
+            cover: track.cover_url || track.album_cover || track.thumbnail || entry.cover || entry.thumbnail,
+            playedAt: entry.playedAt || entry.played_at,
+          };
+        }),
       ];
 
       // Calculate top tracks

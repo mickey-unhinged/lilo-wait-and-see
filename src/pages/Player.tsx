@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ChevronDown, MoreHorizontal, Heart, Share2, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Volume2, Music2, Video, PlusCircle, Radio, User, Flag, Download } from "lucide-react";
+import { ChevronDown, MoreHorizontal, Heart, Share2, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Volume2, Music2, PlusCircle, Radio, User, Flag, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
@@ -8,7 +8,6 @@ import { demoTracks } from "@/hooks/useTracks";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LyricsPanel } from "@/components/player/LyricsPanel";
-import { SyncedVideoPlayer } from "@/components/player/SyncedVideoPlayer";
 import { useToast } from "@/hooks/use-toast";
 import { Watermark } from "@/components/common/Watermark";
 import { ShareToFriendsSheet } from "@/components/inbox/ShareToFriendsSheet";
@@ -51,7 +50,6 @@ const Player = () => {
   const { isLiked, toggleLike } = useLikedSongs();
   const [bars, setBars] = useState<number[]>(Array(40).fill(0.5));
   const [showLyrics, setShowLyrics] = useState(false);
-  const [showVideo, setShowVideo] = useState(false);
   const [showShareSheet, setShowShareSheet] = useState(false);
   const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
   const [isStartingRadio, setIsStartingRadio] = useState(false);
@@ -211,16 +209,16 @@ const Player = () => {
           </DropdownMenu>
         </header>
         
-        {/* Album art with visualizer, lyrics or video side by side */}
+        {/* Album art with visualizer and lyrics side by side */}
         <div className="flex-1 flex items-center justify-center px-4 py-6">
           <div className={cn(
             "flex items-center justify-center gap-4 w-full max-w-4xl transition-all duration-300",
-            (showLyrics || showVideo) ? "flex-row" : "flex-col"
+            showLyrics ? "flex-row" : "flex-col"
           )}>
             {/* Album art container */}
             <div className={cn(
               "relative transition-all duration-300",
-              (showLyrics || showVideo) ? "w-48 h-48 md:w-64 md:h-64 flex-shrink-0" : "w-full max-w-sm aspect-square"
+              showLyrics ? "w-48 h-48 md:w-64 md:h-64 flex-shrink-0" : "w-full max-w-sm aspect-square"
             )}>
               {/* Glow effect */}
               <div 
@@ -244,7 +242,7 @@ const Player = () => {
               />
               
               {/* Visualizer overlay */}
-              {isPlaying && !showLyrics && !showVideo && (
+              {isPlaying && !showLyrics && (
                 <div className="absolute inset-x-0 bottom-0 h-24 flex items-end justify-center gap-0.5 px-6 pb-4">
                   {bars.map((height, i) => (
                     <div
@@ -261,13 +259,6 @@ const Player = () => {
             {showLyrics && (
               <div className="flex-1 h-64 md:h-80 lg:h-96 min-w-0 bg-card/30 rounded-2xl backdrop-blur-sm border border-border/20 overflow-hidden">
                 <LyricsPanel title={track?.title} artist={track?.artist_name} />
-              </div>
-            )}
-
-            {/* Video panel - shown inline when active */}
-            {showVideo && (
-              <div className="flex-1 h-64 md:h-80 lg:h-96 min-w-0 bg-card/30 rounded-2xl backdrop-blur-sm border border-border/20 overflow-hidden p-4">
-                <SyncedVideoPlayer videoId={track?.videoId} title={track?.title} />
               </div>
             )}
           </div>
@@ -293,13 +284,10 @@ const Player = () => {
             </div>
           </div>
           
-          {/* Lyrics & Video buttons */}
+          {/* Lyrics button */}
           <div className="flex items-center gap-2 mt-4">
             <button 
-              onClick={() => {
-                setShowLyrics(!showLyrics);
-                if (!showLyrics) setShowVideo(false);
-              }}
+              onClick={() => setShowLyrics(!showLyrics)}
               className={cn(
                 "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors",
                 showLyrics 
@@ -310,24 +298,6 @@ const Player = () => {
               <Music2 className="w-4 h-4" />
               Lyrics
             </button>
-            
-            {track?.videoId && (
-              <button 
-                onClick={() => {
-                  setShowVideo(!showVideo);
-                  if (!showVideo) setShowLyrics(false);
-                }}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors",
-                  showVideo 
-                    ? "bg-primary text-primary-foreground" 
-                    : "bg-muted/40 hover:bg-muted/60"
-                )}
-              >
-                <Video className="w-4 h-4" />
-                Video
-              </button>
-            )}
             
             <button 
               onClick={handleShare}
