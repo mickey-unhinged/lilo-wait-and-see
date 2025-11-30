@@ -43,14 +43,15 @@ export function AddSongsToPlaylist({ playlistId }: AddSongsToPlaylistProps) {
     try {
       // Get current max position
       const { data: existingTracks } = await supabase
-        .from<{ position: number }>("playlist_tracks")
+        .from("playlist_tracks")
         .select("position")
         .eq("playlist_id", playlistId)
         .order("position", { ascending: false })
         .limit(1);
 
-      const nextPosition = existingTracks && existingTracks.length > 0 
-        ? existingTracks[0].position + 1 
+      const tracksData = existingTracks as any[] | null;
+      const nextPosition = tracksData && tracksData.length > 0 
+        ? tracksData[0].position + 1 
         : 0;
 
       const { error } = await supabase

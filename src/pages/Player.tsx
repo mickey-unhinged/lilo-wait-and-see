@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ChevronDown, MoreHorizontal, Heart, Share2, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, ListMusic, Volume2, Music2, Video, PlusCircle, Radio, User, Flag, Download } from "lucide-react";
+import { ChevronDown, MoreHorizontal, Heart, Share2, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Volume2, Music2, Video, PlusCircle, Radio, User, Flag } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Watermark } from "@/components/common/Watermark";
 import { ShareToFriendsSheet } from "@/components/inbox/ShareToFriendsSheet";
 import { AddToPlaylistSheet } from "@/components/playlist/AddToPlaylistSheet";
+import { QueueManager } from "@/components/player/QueueManager";
 import { supabase } from "@/integrations/supabase/client";
 
 function formatTime(seconds: number): string {
@@ -49,7 +50,6 @@ const Player = () => {
   
   const { isLiked, toggleLike } = useLikedSongs();
   const [bars, setBars] = useState<number[]>(Array(40).fill(0.5));
-  const [showQueue, setShowQueue] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
   const [showShareSheet, setShowShareSheet] = useState(false);
   const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
@@ -396,55 +396,7 @@ const Player = () => {
         
         {/* Bottom controls */}
         <div className="flex items-center justify-between px-8 pb-4">
-          <Sheet open={showQueue} onOpenChange={setShowQueue}>
-            <SheetTrigger asChild>
-              <button className="p-2 text-muted-foreground hover:text-foreground transition-colors">
-                <ListMusic className="w-5 h-5" />
-              </button>
-            </SheetTrigger>
-            <SheetContent side="bottom" className="h-[70vh] rounded-t-3xl">
-              <SheetHeader className="pb-4">
-                <SheetTitle className="text-center">Queue ({queue.length} tracks)</SheetTitle>
-              </SheetHeader>
-              <div className="h-[calc(100%-4rem)] overflow-y-auto space-y-2 px-2">
-                {queue.map((qTrack, index) => (
-                  <button
-                    key={`${qTrack.id}-${index}`}
-                    onClick={() => {
-                      playTrack(qTrack, queue);
-                      setShowQueue(false);
-                    }}
-                    className={cn(
-                      "w-full flex items-center gap-3 p-3 rounded-xl hover:bg-card/50 transition-colors",
-                      currentTrack?.id === qTrack.id && "bg-card/50"
-                    )}
-                  >
-                    <span className="w-6 text-sm text-muted-foreground">{index + 1}</span>
-                    <img 
-                      src={qTrack.cover_url || qTrack.album_cover || "https://images.unsplash.com/photo-1614149162883-504ce4d13909?w=100&h=100&fit=crop"}
-                      alt={qTrack.title}
-                      className="w-10 h-10 rounded-lg object-cover"
-                    />
-                    <div className="flex-1 min-w-0 text-left">
-                      <p className={cn(
-                        "font-medium truncate text-sm",
-                        currentTrack?.id === qTrack.id && "text-primary"
-                      )}>
-                        {qTrack.title}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">{qTrack.artist_name}</p>
-                    </div>
-                  </button>
-                ))}
-                {queue.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p>Queue is empty</p>
-                    <p className="text-sm">Add songs to start playing</p>
-                  </div>
-                )}
-              </div>
-            </SheetContent>
-          </Sheet>
+          <QueueManager />
           
           <div className="flex items-center gap-2 w-32">
             <Volume2 className="w-4 h-4 text-muted-foreground" />
