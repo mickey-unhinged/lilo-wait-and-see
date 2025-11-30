@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Track, usePlayer } from "@/contexts/PlayerContext";
 import { TrackCard } from "./TrackCard";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { extractKeywordsFromHistory } from "@/hooks/useSearchHistory";
 
 interface PlayHistoryEntry {
   track: Track;
@@ -43,6 +44,15 @@ export function DailyMixSection() {
     const seedArtists = getSeedArtists();
     setSeeds(seedArtists);
     fetchRecommendations(seedArtists);
+    
+    // Refresh every 20 minutes for variety
+    const interval = setInterval(() => {
+      const newSeeds = getSeedArtists();
+      setSeeds(newSeeds);
+      fetchRecommendations(newSeeds);
+    }, 20 * 60 * 1000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const title = useMemo(() => {
@@ -56,10 +66,14 @@ export function DailyMixSection() {
     setIsLoading(true);
     setError(null);
     try {
-      const body =
-        seedArtists.length > 0
-          ? { type: "personalized", seedArtists, limit: 12 }
-          : { limit: 12 };
+      const searchTerms = extractKeywordsFromHistory();
+      
+      const body = {
+        type: "personalized",
+        seedArtists,
+        searchTerms,
+        limit: 12,
+      };
 
       const { data, error: fnError } = await supabase.functions.invoke("trending-suggestions", {
         body,
@@ -118,10 +132,11 @@ export function DailyMixSection() {
                 artist={track.artist_name}
                 imageUrl={
                   track.cover_url ||
-                  track.album_cover ||
-                  "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=200&h=200&fit=crop"
+                  `https://i.ytimg.com/vi/${track.videoId}/hqdefault.jpg`
                 }
                 onClick={() => handlePlay(track)}
+                track={track}
+                showDownload
               />
             ))}
           </div>
@@ -131,4 +146,3 @@ export function DailyMixSection() {
     </section>
   );
 }
-

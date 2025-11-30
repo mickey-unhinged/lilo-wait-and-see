@@ -5,6 +5,7 @@ import { HorizontalScroll } from "./HorizontalScroll";
 import { TrackCard } from "./TrackCard";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { extractKeywordsFromHistory } from "@/hooks/useSearchHistory";
 
 export function ForYouSection() {
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -13,19 +14,21 @@ export function ForYouSection() {
 
   useEffect(() => {
     fetchPersonalizedTracks();
+    
+    // Refresh every 30 minutes for variety
+    const interval = setInterval(fetchPersonalizedTracks, 30 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchPersonalizedTracks = async () => {
     setIsLoading(true);
     try {
-      // Get user's play history from localStorage
+      // Get user's play history
       const stored = localStorage.getItem("lilo-play-history");
       let seedArtists: string[] = [];
-      let seedGenres: string[] = [];
 
       if (stored) {
         const history = JSON.parse(stored);
-        // Extract unique artists from history
         const artistCounts: Record<string, number> = {};
         history.forEach((entry: any) => {
           const artist = entry.track?.artist_name || entry.track?.artist;
@@ -34,24 +37,21 @@ export function ForYouSection() {
           }
         });
         
-        // Get top 3 artists
+        // Get top 4 artists
         seedArtists = Object.entries(artistCounts)
           .sort(([, a], [, b]) => b - a)
-          .slice(0, 3)
+          .slice(0, 4)
           .map(([artist]) => artist);
       }
 
-      // If no history, use default popular genres
-      if (seedArtists.length === 0) {
-        seedGenres = ["pop", "hip hop", "r&b"];
-      }
+      // Get search history keywords
+      const searchTerms = extractKeywordsFromHistory();
 
-      // Call edge function to get personalized recommendations
       const { data, error } = await supabase.functions.invoke("trending-suggestions", {
         body: {
           type: "personalized",
           seedArtists,
-          seedGenres,
+          searchTerms,
           limit: 12,
         },
       });

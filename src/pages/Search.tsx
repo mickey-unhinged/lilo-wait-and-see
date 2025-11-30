@@ -9,6 +9,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { Watermark } from "@/components/common/Watermark";
 import type { Track } from "@/contexts/PlayerContext";
 import { useVoiceSearch } from "@/hooks/useVoiceSearch";
+import { useSearchHistory } from "@/hooks/useSearchHistory";
 
 type SearchSource = "live" | "itunes";
 
@@ -50,6 +51,7 @@ const Search = () => {
   const [isFocused, setIsFocused] = useState(false);
   const [searchSource, setSearchSource] = useState<SearchSource>("live");
   const debouncedQuery = useDebounce(query, 400);
+  const { addToHistory } = useSearchHistory();
   
   const liveVideo = useLiveVideoSearch();
   const iTunes = useMusicSearch();
@@ -69,9 +71,12 @@ const Search = () => {
   const results: Track[] = searchSource === "live" ? liveResults : itunesResults;
   const isLoading = searchSource === "live" ? liveLoading : itunesLoading;
 
-  // Search when debounced query changes
+  // Search when debounced query changes and save to history
   useEffect(() => {
     if (debouncedQuery.trim()) {
+      // Save search to history for personalized recommendations
+      addToHistory(debouncedQuery);
+      
       if (searchSource === "live") {
         searchLive(debouncedQuery);
       } else {
@@ -81,7 +86,7 @@ const Search = () => {
       clearLive();
       clearItunes();
     }
-  }, [debouncedQuery, searchSource, searchLive, searchItunes, clearLive, clearItunes]);
+  }, [debouncedQuery, searchSource, searchLive, searchItunes, clearLive, clearItunes, addToHistory]);
 
   const handleGenreClick = (genreName: string) => {
     setQuery(genreName);
