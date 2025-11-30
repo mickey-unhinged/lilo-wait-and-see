@@ -26,25 +26,23 @@ const MOOD_QUERIES: Record<string, string[]> = {
   sad: ["sad songs", "emotional music", "heartbreak songs", "melancholy playlist", "sad vibes"],
 };
 
-// Use Invidious API as primary source (more reliable)
+// Invidious instances with fast timeout
 async function fetchFromInvidious(): Promise<Track[]> {
   const instances = [
     "https://vid.puffyan.us",
-    "https://invidious.snopyta.org",
-    "https://yewtu.be",
-    "https://inv.nadeko.net",
     "https://invidious.nerdvpn.de",
+    "https://inv.nadeko.net",
+    "https://yewtu.be",
+    "https://invidious.snopyta.org",
+    "https://invidious.privacydev.net",
+    "https://invidious.slipfox.xyz",
   ];
 
   for (const instance of instances) {
     try {
-      // Fetch trending music
       const response = await fetch(`${instance}/api/v1/trending?type=music&region=US`, {
-        headers: { 
-          "User-Agent": "Lilo/1.0",
-          "Accept": "application/json",
-        },
-        signal: AbortSignal.timeout(6000),
+        headers: { "User-Agent": "Lilo/1.0", "Accept": "application/json" },
+        signal: AbortSignal.timeout(4000),
       });
 
       if (!response.ok) {
@@ -56,7 +54,6 @@ async function fetchFromInvidious(): Promise<Track[]> {
       const tracks: Track[] = [];
 
       for (const item of data) {
-        // Only include music videos (shorter duration)
         if (item.lengthSeconds && item.lengthSeconds < 600 && item.lengthSeconds > 60) {
           tracks.push({
             id: `ytm-${item.videoId}`,
@@ -72,7 +69,7 @@ async function fetchFromInvidious(): Promise<Track[]> {
 
       if (tracks.length > 0) {
         console.log(`Found ${tracks.length} tracks from ${instance}`);
-        return tracks.slice(0, 20);
+        return tracks.slice(0, 25);
       }
     } catch (e) {
       console.error(`Invidious instance ${instance} failed:`, e);
@@ -89,6 +86,7 @@ async function searchInvidious(query: string): Promise<Track[]> {
     "https://yewtu.be",
     "https://inv.nadeko.net",
     "https://invidious.nerdvpn.de",
+    "https://invidious.privacydev.net",
   ];
 
   for (const instance of instances) {
@@ -96,11 +94,8 @@ async function searchInvidious(query: string): Promise<Track[]> {
       const response = await fetch(
         `${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=video&sort=relevance`,
         {
-          headers: { 
-            "User-Agent": "Lilo/1.0",
-            "Accept": "application/json",
-          },
-          signal: AbortSignal.timeout(6000),
+          headers: { "User-Agent": "Lilo/1.0", "Accept": "application/json" },
+          signal: AbortSignal.timeout(4000),
         }
       );
 
@@ -123,9 +118,7 @@ async function searchInvidious(query: string): Promise<Track[]> {
         }
       }
 
-      if (tracks.length > 0) {
-        return tracks.slice(0, 10);
-      }
+      if (tracks.length > 0) return tracks.slice(0, 10);
     } catch (e) {
       console.error(`Search on ${instance} failed:`, e);
     }
@@ -134,8 +127,8 @@ async function searchInvidious(query: string): Promise<Track[]> {
   return [];
 }
 
-// Expanded fallback list with more variety - rotates based on time
-function getFallbackTracks(mood?: string, seed?: number): Track[] {
+// MASSIVE expanded fallback list - 120+ songs across diverse genres
+function getFallbackTracks(mood?: string, seed?: number, offset?: number): Track[] {
   const moodTracks: Record<string, Array<{ title: string; artist: string; videoId: string }>> = {
     chill: [
       { title: "Sunflower", artist: "Post Malone & Swae Lee", videoId: "ApXoWvfEYVU" },
@@ -143,6 +136,8 @@ function getFallbackTracks(mood?: string, seed?: number): Track[] {
       { title: "Peaches", artist: "Justin Bieber", videoId: "tQ0yjYUFKAE" },
       { title: "drivers license", artist: "Olivia Rodrigo", videoId: "ZmDBbnmKpqQ" },
       { title: "Easy On Me", artist: "Adele", videoId: "U3ASj1L6_sY" },
+      { title: "Stay With Me", artist: "Sam Smith", videoId: "pB-5XG-DbAA" },
+      { title: "Perfect", artist: "Ed Sheeran", videoId: "2Vv-BfVoq4g" },
     ],
     energy: [
       { title: "Uptown Funk", artist: "Bruno Mars", videoId: "OPf0YbXqDm0" },
@@ -150,6 +145,7 @@ function getFallbackTracks(mood?: string, seed?: number): Track[] {
       { title: "Shake It Off", artist: "Taylor Swift", videoId: "nfWlot6h_JM" },
       { title: "Happy", artist: "Pharrell Williams", videoId: "ZbZSe6N_BXs" },
       { title: "Dynamite", artist: "BTS", videoId: "gdZLi9oWNZg" },
+      { title: "24K Magic", artist: "Bruno Mars", videoId: "UqyT8IEBkvY" },
     ],
     focus: [
       { title: "Experience", artist: "Ludovico Einaudi", videoId: "hN_q-_nGv4U" },
@@ -181,56 +177,152 @@ function getFallbackTracks(mood?: string, seed?: number): Track[] {
     ],
   };
 
-  // Extended list of popular songs - rotates based on time seed
+  // MASSIVE list of 120+ songs for variety - organized by genre groups
   const allPopularSongs = [
-    // Group 1 - Current Hits
+    // Group 1 - 2024 Hits
+    { title: "Espresso", artist: "Sabrina Carpenter", videoId: "eVli-tstM5E" },
+    { title: "Beautiful Things", artist: "Benson Boone", videoId: "Oa3yLIk6fzM" },
+    { title: "Lose Control", artist: "Teddy Swims", videoId: "x3iOTqWTveI" },
+    { title: "Too Sweet", artist: "Hozier", videoId: "fevmlKYHNuM" },
+    { title: "A Bar Song (Tipsy)", artist: "Shaboozey", videoId: "DGSaVxCAOSw" },
+    // Group 2 - Pop Classics
     { title: "Blinding Lights", artist: "The Weeknd", videoId: "4NRXx6U8ABQ" },
     { title: "Shape of You", artist: "Ed Sheeran", videoId: "JGwWNGJdvx8" },
     { title: "Dance Monkey", artist: "Tones and I", videoId: "q0hyYWKXF0Q" },
     { title: "Someone You Loved", artist: "Lewis Capaldi", videoId: "zABLecsR5UE" },
     { title: "Watermelon Sugar", artist: "Harry Styles", videoId: "E07s5ZYygMg" },
-    // Group 2 - Pop Hits
+    // Group 3 - Dua Lipa Era
     { title: "Don't Start Now", artist: "Dua Lipa", videoId: "oygrmJFKYZY" },
     { title: "Levitating", artist: "Dua Lipa", videoId: "TUVcZfQe-Kw" },
-    { title: "Stay", artist: "The Kid LAROI & Justin Bieber", videoId: "kTJczUoc26U" },
-    { title: "Heat Waves", artist: "Glass Animals", videoId: "mRD0-GxqHVo" },
-    { title: "As It Was", artist: "Harry Styles", videoId: "H5v3kku4y6Q" },
-    // Group 3 - 2023-2024 Hits
+    { title: "Physical", artist: "Dua Lipa", videoId: "9HDEHj2yzew" },
+    { title: "New Rules", artist: "Dua Lipa", videoId: "k2qgadSvNyU" },
+    { title: "One Kiss", artist: "Calvin Harris & Dua Lipa", videoId: "DkeiKbqa02g" },
+    // Group 4 - Taylor Swift
     { title: "Anti-Hero", artist: "Taylor Swift", videoId: "b1kbLwvqugk" },
+    { title: "Cruel Summer", artist: "Taylor Swift", videoId: "ic8j13piAhQ" },
+    { title: "Blank Space", artist: "Taylor Swift", videoId: "e-ORhEE9VVg" },
+    { title: "Shake It Off", artist: "Taylor Swift", videoId: "nfWlot6h_JM" },
+    { title: "Love Story", artist: "Taylor Swift", videoId: "8xg3vE8Ie_E" },
+    // Group 5 - Hip-Hop/Rap
+    { title: "God's Plan", artist: "Drake", videoId: "xpVfcZ0ZcFM" },
+    { title: "HUMBLE.", artist: "Kendrick Lamar", videoId: "tvTRZJ-4EyI" },
+    { title: "Old Town Road", artist: "Lil Nas X", videoId: "w2Ov5jzm3j8" },
+    { title: "Sicko Mode", artist: "Travis Scott", videoId: "6ONRf7h3Mdk" },
+    { title: "Rockstar", artist: "Post Malone", videoId: "UceaB4D0jpo" },
+    // Group 6 - R&B/Soul
     { title: "Flowers", artist: "Miley Cyrus", videoId: "G7KNmW9a75Y" },
     { title: "Kill Bill", artist: "SZA", videoId: "hTGdWMlPPRc" },
-    { title: "Unholy", artist: "Sam Smith & Kim Petras", videoId: "Uq9gPaIzbe8" },
+    { title: "Snooze", artist: "SZA", videoId: "LwE6LxqGKmo" },
+    { title: "Good Days", artist: "SZA", videoId: "2p3zZoraK9g" },
+    { title: "Kiss Me More", artist: "Doja Cat ft. SZA", videoId: "0EVVKs6DQLo" },
+    // Group 7 - Latin/Reggaeton
+    { title: "Despacito", artist: "Luis Fonsi ft. Daddy Yankee", videoId: "kJQP7kiw5Fk" },
+    { title: "Tití Me Preguntó", artist: "Bad Bunny", videoId: "iaGobs5i1qw" },
+    { title: "Dákiti", artist: "Bad Bunny & Jhay Cortez", videoId: "TmKh7lAwnBI" },
+    { title: "Me Porto Bonito", artist: "Bad Bunny", videoId: "F79D9P8wVHk" },
     { title: "Calm Down", artist: "Rema & Selena Gomez", videoId: "CQLsdm1ZYAw" },
-    // Group 4 - Classics
+    // Group 8 - K-Pop
+    { title: "Dynamite", artist: "BTS", videoId: "gdZLi9oWNZg" },
+    { title: "Butter", artist: "BTS", videoId: "WMweEpGlu_U" },
+    { title: "Pink Venom", artist: "BLACKPINK", videoId: "gQlMMD8auMs" },
+    { title: "How You Like That", artist: "BLACKPINK", videoId: "ioNng23DkIM" },
+    { title: "Super Shy", artist: "NewJeans", videoId: "ArmDp-zijuc" },
+    // Group 9 - Rock/Alternative
+    { title: "Sweater Weather", artist: "The Neighbourhood", videoId: "GCdwKhTtNNw" },
+    { title: "Mr. Brightside", artist: "The Killers", videoId: "gGdGFtwCNBE" },
+    { title: "Radioactive", artist: "Imagine Dragons", videoId: "ktvTqknDobU" },
+    { title: "Believer", artist: "Imagine Dragons", videoId: "7wtfhZwyrcc" },
+    { title: "Thunder", artist: "Imagine Dragons", videoId: "fKopy74weus" },
+    // Group 10 - EDM/Electronic
+    { title: "Titanium", artist: "David Guetta ft. Sia", videoId: "JRfuAukYTKg" },
+    { title: "Lean On", artist: "Major Lazer & DJ Snake", videoId: "YqeW9_5kURI" },
+    { title: "Clarity", artist: "Zedd ft. Foxes", videoId: "IxxstCcJlsc" },
+    { title: "Faded", artist: "Alan Walker", videoId: "60ItHLz5WEA" },
+    { title: "Wake Me Up", artist: "Avicii", videoId: "IcrbM1l_BoI" },
+    // Group 11 - 2023 Hits
+    { title: "Vampire", artist: "Olivia Rodrigo", videoId: "RlPNh_PBZb4" },
+    { title: "Last Night", artist: "Morgan Wallen", videoId: "BnlYN-cFZmg" },
+    { title: "Unholy", artist: "Sam Smith & Kim Petras", videoId: "Uq9gPaIzbe8" },
+    { title: "Creepin'", artist: "Metro Boomin, The Weeknd & 21 Savage", videoId: "6FWUjJF1ai0" },
+    { title: "Boy's a Liar Pt. 2", artist: "PinkPantheress & Ice Spice", videoId: "SMrN5QSz8e0" },
+    // Group 12 - Billie Eilish
+    { title: "Bad Guy", artist: "Billie Eilish", videoId: "DyDfgMOUjCI" },
+    { title: "lovely", artist: "Billie Eilish & Khalid", videoId: "V1Pl8CzNzCw" },
+    { title: "Happier Than Ever", artist: "Billie Eilish", videoId: "5GJWxDKyk3A" },
+    { title: "Ocean Eyes", artist: "Billie Eilish", videoId: "viimfQi_pUw" },
+    { title: "Therefore I Am", artist: "Billie Eilish", videoId: "RUQl6YcMalg" },
+    // Group 13 - Bruno Mars
+    { title: "Uptown Funk", artist: "Bruno Mars", videoId: "OPf0YbXqDm0" },
+    { title: "24K Magic", artist: "Bruno Mars", videoId: "UqyT8IEBkvY" },
+    { title: "Just The Way You Are", artist: "Bruno Mars", videoId: "LjhCEhWiKXk" },
+    { title: "That's What I Like", artist: "Bruno Mars", videoId: "PMivT7MJ41M" },
+    { title: "Leave The Door Open", artist: "Silk Sonic", videoId: "adLGHcj_fmA" },
+    // Group 14 - Classics
     { title: "Bohemian Rhapsody", artist: "Queen", videoId: "fJ9rUzIMcZQ" },
     { title: "Sweet Child O' Mine", artist: "Guns N' Roses", videoId: "1w7OgIMMRc4" },
     { title: "Billie Jean", artist: "Michael Jackson", videoId: "Zi_XLOBDo_Y" },
     { title: "Take On Me", artist: "a-ha", videoId: "djV11Xbc914" },
     { title: "Africa", artist: "Toto", videoId: "FTQbiNvZqaY" },
-    // Group 5 - Hip-Hop/R&B
-    { title: "God's Plan", artist: "Drake", videoId: "xpVfcZ0ZcFM" },
-    { title: "HUMBLE.", artist: "Kendrick Lamar", videoId: "tvTRZJ-4EyI" },
-    { title: "Old Town Road", artist: "Lil Nas X", videoId: "w2Ov5jzm3j8" },
-    { title: "Sicko Mode", artist: "Travis Scott", videoId: "6ONRf7h3Mdk" },
-    { title: "Bad Guy", artist: "Billie Eilish", videoId: "DyDfgMOUjCI" },
-    // Group 6 - Latin/International
-    { title: "Despacito", artist: "Luis Fonsi ft. Daddy Yankee", videoId: "kJQP7kiw5Fk" },
-    { title: "Tití Me Preguntó", artist: "Bad Bunny", videoId: "iaGobs5i1qw" },
-    { title: "Dákiti", artist: "Bad Bunny & Jhay Cortez", videoId: "TmKh7lAwnBI" },
-    { title: "Butter", artist: "BTS", videoId: "WMweEpGlu_U" },
-    { title: "Pink Venom", artist: "BLACKPINK", videoId: "gQlMMD8auMs" },
-    // Group 7 - Alternative/Indie
-    { title: "Sweater Weather", artist: "The Neighbourhood", videoId: "GCdwKhTtNNw" },
-    { title: "Mr. Brightside", artist: "The Killers", videoId: "gGdGFtwCNBE" },
-    { title: "Radioactive", artist: "Imagine Dragons", videoId: "ktvTqknDobU" },
+    // Group 15 - Ariana Grande
+    { title: "7 rings", artist: "Ariana Grande", videoId: "QYh6mYIJG2Y" },
+    { title: "thank u, next", artist: "Ariana Grande", videoId: "gl1aHhXnN1k" },
+    { title: "positions", artist: "Ariana Grande", videoId: "tcYodQoapMg" },
+    { title: "Into You", artist: "Ariana Grande", videoId: "1ekZEVeXwek" },
+    { title: "No Tears Left To Cry", artist: "Ariana Grande", videoId: "ffxKSjUwKdU" },
+    // Group 16 - The Weeknd
+    { title: "Starboy", artist: "The Weeknd", videoId: "34Na4j8AVgA" },
+    { title: "Save Your Tears", artist: "The Weeknd", videoId: "XXYlFuWEuKI" },
+    { title: "Die For You", artist: "The Weeknd", videoId: "mTLQhPFx2nM" },
+    { title: "Can't Feel My Face", artist: "The Weeknd", videoId: "KEI4qSrkPAs" },
+    { title: "The Hills", artist: "The Weeknd", videoId: "yzTuBuRdAyA" },
+    // Group 17 - Justin Bieber
+    { title: "Stay", artist: "The Kid LAROI & Justin Bieber", videoId: "kTJczUoc26U" },
+    { title: "Peaches", artist: "Justin Bieber", videoId: "tQ0yjYUFKAE" },
+    { title: "Sorry", artist: "Justin Bieber", videoId: "fRh_vgS2dFE" },
+    { title: "Love Yourself", artist: "Justin Bieber", videoId: "oyEuk8j8imI" },
+    { title: "What Do You Mean?", artist: "Justin Bieber", videoId: "DK_0jXPuIr0" },
+    // Group 18 - Harry Styles
+    { title: "As It Was", artist: "Harry Styles", videoId: "H5v3kku4y6Q" },
+    { title: "Watermelon Sugar", artist: "Harry Styles", videoId: "E07s5ZYygMg" },
+    { title: "Sign of the Times", artist: "Harry Styles", videoId: "qN4ooNx77u0" },
+    { title: "Late Night Talking", artist: "Harry Styles", videoId: "jjt9Av7GIPY" },
+    { title: "Adore You", artist: "Harry Styles", videoId: "VF-r5TtlT9w" },
+    // Group 19 - Post Malone
+    { title: "Sunflower", artist: "Post Malone & Swae Lee", videoId: "ApXoWvfEYVU" },
+    { title: "Circles", artist: "Post Malone", videoId: "wXhTHyIgQ_U" },
+    { title: "Congratulations", artist: "Post Malone", videoId: "SC4xMk98Pdc" },
+    { title: "Better Now", artist: "Post Malone", videoId: "UYwF-jdcVjY" },
+    { title: "I Like You", artist: "Post Malone & Doja Cat", videoId: "cksrPF3PQFQ" },
+    // Group 20 - Doja Cat
+    { title: "Say So", artist: "Doja Cat", videoId: "pok8H_KF1FA" },
+    { title: "Woman", artist: "Doja Cat", videoId: "MNSjHt3Hb-4" },
+    { title: "Need to Know", artist: "Doja Cat", videoId: "L3yEnGNt5QA" },
+    { title: "Streets", artist: "Doja Cat", videoId: "r4RKfODj-LQ" },
+    { title: "Get Into It (Yuh)", artist: "Doja Cat", videoId: "VPFb1XmmLsE" },
+    // Group 21 - Olivia Rodrigo
+    { title: "drivers license", artist: "Olivia Rodrigo", videoId: "ZmDBbnmKpqQ" },
+    { title: "good 4 u", artist: "Olivia Rodrigo", videoId: "gNi_6U5Pm_o" },
+    { title: "deja vu", artist: "Olivia Rodrigo", videoId: "cii6ruuycQA" },
+    { title: "traitor", artist: "Olivia Rodrigo", videoId: "5GDIe1nQa30" },
+    { title: "brutal", artist: "Olivia Rodrigo", videoId: "gMorPVFKqvQ" },
+    // Group 22 - Drake
+    { title: "One Dance", artist: "Drake", videoId: "qL7zrWKBTwY" },
+    { title: "Hotline Bling", artist: "Drake", videoId: "uxpDa-c-4Mc" },
+    { title: "In My Feelings", artist: "Drake", videoId: "DRS_PpOrUZ4" },
+    { title: "Nice For What", artist: "Drake", videoId: "U9BwWKXjVaI" },
+    { title: "Started From the Bottom", artist: "Drake", videoId: "RubBzkZzpUA" },
+    // Group 23 - Indie/Alternative
+    { title: "Heat Waves", artist: "Glass Animals", videoId: "mRD0-GxqHVo" },
+    { title: "Take Me To Church", artist: "Hozier", videoId: "PVjiKRfKpPI" },
     { title: "Stressed Out", artist: "Twenty One Pilots", videoId: "pXRviuL6vMY" },
-    { title: "Believer", artist: "Imagine Dragons", videoId: "7wtfhZwyrcc" },
-    // Group 8 - Recent Releases
-    { title: "Vampire", artist: "Olivia Rodrigo", videoId: "RlPNh_PBZb4" },
-    { title: "Cruel Summer", artist: "Taylor Swift", videoId: "ic8j13piAhQ" },
-    { title: "Last Night", artist: "Morgan Wallen", videoId: "BnlYN-cFZmg" },
-    { title: "Snooze", artist: "SZA", videoId: "LwE6LxqGKmo" },
-    { title: "Creepin'", artist: "Metro Boomin, The Weeknd & 21 Savage", videoId: "6FWUjJF1ai0" },
+    { title: "Heathens", artist: "Twenty One Pilots", videoId: "UprcpdwuwCg" },
+    { title: "Pumped Up Kicks", artist: "Foster The People", videoId: "SDTZ7iX4vTQ" },
+    // Group 24 - Recent Viral
+    { title: "Makeba", artist: "Jain", videoId: "59Q_lhgGANc" },
+    { title: "Until I Found You", artist: "Stephen Sanchez", videoId: "GxldQ9eX2wo" },
+    { title: "Daylight", artist: "David Kushner", videoId: "lYdLVgJ3TPI" },
+    { title: "Ghost", artist: "Justin Bieber", videoId: "Fp8msa5uYsc" },
+    { title: "abcdefu", artist: "GAYLE", videoId: "NaFd8ucHLuo" },
   ];
 
   if (mood && moodTracks[mood]) {
@@ -246,13 +338,13 @@ function getFallbackTracks(mood?: string, seed?: number): Track[] {
     }));
   }
 
-  // Use seed to determine which group to prioritize
-  const effectiveSeed = seed || Math.floor(Date.now() / (1000 * 60 * 30)); // Changes every 30 mins
+  // Use seed + offset to get different songs for different sections
+  const effectiveSeed = (seed || Math.floor(Date.now() / (1000 * 60 * 15))) + (offset || 0);
   const groupSize = 5;
   const numGroups = Math.ceil(allPopularSongs.length / groupSize);
   const startGroup = effectiveSeed % numGroups;
-  
-  // Rotate songs based on seed - prioritize different groups at different times
+
+  // Rotate songs based on seed
   const rotatedSongs: typeof allPopularSongs = [];
   for (let i = 0; i < numGroups; i++) {
     const groupIndex = (startGroup + i) % numGroups;
@@ -272,18 +364,17 @@ function getFallbackTracks(mood?: string, seed?: number): Track[] {
   }));
 }
 
-// Get seeded shuffle for consistent but varied results
 function seededShuffle<T>(array: T[], seed: number): T[] {
   const result = [...array];
   let m = result.length;
   let s = seed;
-  
+
   while (m) {
     s = (s * 9301 + 49297) % 233280;
     const i = Math.floor((s / 233280) * m--);
     [result[m], result[i]] = [result[i], result[m]];
   }
-  
+
   return result;
 }
 
@@ -297,49 +388,50 @@ serve(async (req) => {
     try {
       body = await req.json();
     } catch {
-      // No body provided, use defaults
+      // No body
     }
 
-    const { type, mood, seedArtists, seedGenres, searchTerms, weekSeed, currentTrackId, limit = 20 } = body;
+    const { type, mood, seedArtists, seedGenres, searchTerms, weekSeed, currentTrackId, sectionOffset = 0, limit = 20 } = body;
 
-    console.log("Fetching suggestions...", { type, mood, seedArtists, searchTerms });
+    console.log("Fetching suggestions...", { type, mood, seedArtists, sectionOffset });
 
     let tracks: Track[] = [];
-    const hourSeed = Math.floor(Date.now() / (1000 * 60 * 60)); // Changes every hour
-    const halfHourSeed = Math.floor(Date.now() / (1000 * 60 * 30)); // Changes every 30 mins
+    
+    // Different time seeds for variety - each section can use different offset
+    const now = Date.now();
+    const seed15min = Math.floor(now / (1000 * 60 * 15));
+    const seed20min = Math.floor(now / (1000 * 60 * 20));
+    const seed25min = Math.floor(now / (1000 * 60 * 25));
 
     if (type === "autoplay" && seedArtists?.length > 0) {
-      // Autoplay: fetch similar tracks based on current artist
       const queries = [
         `${seedArtists[0]} similar songs`,
         `songs like ${seedArtists[0]}`,
         `${seedArtists[0]} top songs`,
         "popular music 2024",
       ];
-      
-      const shuffledQueries = seededShuffle(queries, hourSeed);
+
+      const shuffledQueries = seededShuffle(queries, seed20min);
       const allTracks: Track[] = [];
-      
+
       for (const query of shuffledQueries.slice(0, 3)) {
         const results = await searchInvidious(query);
         allTracks.push(...results);
       }
-      
-      // Dedupe and filter out current track
+
       const seen = new Set<string>();
       if (currentTrackId) seen.add(currentTrackId);
-      
-      tracks = allTracks.filter(t => {
+
+      tracks = allTracks.filter((t) => {
         if (seen.has(t.id)) return false;
         seen.add(t.id);
         return true;
       });
-      
-      tracks = seededShuffle(tracks, hourSeed).slice(0, limit);
-      
-      // Add fallback if not enough
+
+      tracks = seededShuffle(tracks, seed20min).slice(0, limit);
+
       if (tracks.length < 5) {
-        const fallback = getFallbackTracks(undefined, halfHourSeed);
+        const fallback = getFallbackTracks(undefined, seed20min, sectionOffset);
         for (const t of fallback) {
           if (!seen.has(t.id)) {
             tracks.push(t);
@@ -348,41 +440,34 @@ serve(async (req) => {
         }
       }
     } else if (type === "discover-weekly") {
-      // Discover Weekly: personalized weekly playlist
-      const weeklySeed = weekSeed || Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
-      
+      const weeklySeed = weekSeed || Math.floor(now / (7 * 24 * 60 * 60 * 1000));
+
       const queries: string[] = [];
-      
-      // Add user's favorite artists
       if (seedArtists?.length > 0) {
         queries.push(...seedArtists.slice(0, 3).map((a: string) => `${a} best songs`));
         queries.push(...seedArtists.slice(0, 2).map((a: string) => `artists similar to ${a}`));
       }
-      
-      // Add discovery queries
       queries.push("new music 2024", "trending songs", "best new songs", "viral hits");
-      
+
       const shuffledQueries = seededShuffle(queries, weeklySeed);
       const allTracks: Track[] = [];
-      
+
       for (const query of shuffledQueries.slice(0, 4)) {
         const results = await searchInvidious(query);
         allTracks.push(...results);
       }
-      
-      // Dedupe and shuffle
+
       const seen = new Set<string>();
-      tracks = allTracks.filter(t => {
+      tracks = allTracks.filter((t) => {
         if (seen.has(t.id)) return false;
         seen.add(t.id);
         return true;
       });
-      
+
       tracks = seededShuffle(tracks, weeklySeed).slice(0, limit);
-      
-      // Add fallback if not enough
+
       if (tracks.length < limit / 2) {
-        const fallback = getFallbackTracks(undefined, weeklySeed);
+        const fallback = getFallbackTracks(undefined, weeklySeed, 7);
         for (const t of seededShuffle(fallback, weeklySeed)) {
           if (!seen.has(t.id)) {
             tracks.push(t);
@@ -391,38 +476,33 @@ serve(async (req) => {
         }
       }
     } else if (type === "mood" && mood && MOOD_QUERIES[mood]) {
-      // Mood-based playlist generation
       const queries = MOOD_QUERIES[mood];
-      const shuffledQueries = seededShuffle(queries, hourSeed);
-      
+      const shuffledQueries = seededShuffle(queries, seed15min);
+
       const allTracks: Track[] = [];
-      
-      // Add seed artist influence if available
+
       if (seedArtists?.length > 0) {
         const artistQuery = `${seedArtists[0]} ${mood} music`;
         const artistResults = await searchInvidious(artistQuery);
         allTracks.push(...artistResults);
       }
-      
-      // Search mood-based queries
+
       for (const query of shuffledQueries.slice(0, 2)) {
         const results = await searchInvidious(query);
         allTracks.push(...results);
       }
-      
-      // Dedupe and shuffle
+
       const seen = new Set<string>();
-      tracks = allTracks.filter(t => {
+      tracks = allTracks.filter((t) => {
         if (seen.has(t.id)) return false;
         seen.add(t.id);
         return true;
       });
-      
-      tracks = seededShuffle(tracks, hourSeed).slice(0, limit);
-      
-      // Add fallback if not enough tracks
+
+      tracks = seededShuffle(tracks, seed15min).slice(0, limit);
+
       if (tracks.length < limit / 2) {
-        const fallback = getFallbackTracks(mood, halfHourSeed);
+        const fallback = getFallbackTracks(mood, seed15min);
         for (const t of fallback) {
           if (!seen.has(t.id)) {
             tracks.push(t);
@@ -432,44 +512,40 @@ serve(async (req) => {
         }
       }
     } else if (type === "personalized" && (seedArtists?.length > 0 || seedGenres?.length > 0 || searchTerms?.length > 0)) {
-      // Personalized recommendations based on user's listening history
       const queries: string[] = [];
-      
+
       if (seedArtists?.length > 0) {
         queries.push(...seedArtists.slice(0, 2).map((a: string) => `${a} songs`));
       }
-      
+
       if (searchTerms?.length > 0) {
         queries.push(...searchTerms.slice(0, 2).map((t: string) => `${t} music`));
       }
-      
+
       if (seedGenres?.length > 0) {
         queries.push(...seedGenres.slice(0, 2).map((g: string) => `${g} music 2024`));
       }
 
-      // Search for each query and combine results
+      const shuffledQueries = seededShuffle(queries, seed25min + sectionOffset);
       const allTracks: Track[] = [];
-      const shuffledQueries = seededShuffle(queries, hourSeed);
-      
+
       for (const query of shuffledQueries.slice(0, 3)) {
         const results = await searchInvidious(query);
         allTracks.push(...results);
       }
 
-      // Shuffle and dedupe
       const seen = new Set<string>();
-      tracks = allTracks.filter(t => {
+      tracks = allTracks.filter((t) => {
         if (seen.has(t.id)) return false;
         seen.add(t.id);
         return true;
       });
-      
-      tracks = seededShuffle(tracks, hourSeed).slice(0, limit);
 
-      // If not enough personalized results, add some trending/fallback
+      tracks = seededShuffle(tracks, seed25min + sectionOffset).slice(0, limit);
+
       if (tracks.length < limit / 2) {
         const trending = await fetchFromInvidious();
-        const fallback = trending.length > 0 ? trending : getFallbackTracks(undefined, halfHourSeed);
+        const fallback = trending.length > 0 ? trending : getFallbackTracks(undefined, seed25min, sectionOffset);
         for (const t of fallback) {
           if (!seen.has(t.id)) {
             tracks.push(t);
@@ -478,17 +554,15 @@ serve(async (req) => {
         }
       }
     } else {
-      // Default: fetch trending
+      // Default: fetch trending with offset for variety
       tracks = await fetchFromInvidious();
-      
-      // Use fallback if no results - with rotation based on time
+
       if (tracks.length === 0) {
         console.log("Invidious failed, using fallback tracks with rotation");
-        tracks = getFallbackTracks(undefined, halfHourSeed);
+        tracks = getFallbackTracks(undefined, seed15min, sectionOffset);
       }
-      
-      // Shuffle for variety
-      tracks = seededShuffle(tracks, halfHourSeed);
+
+      tracks = seededShuffle(tracks, seed15min + sectionOffset);
     }
 
     console.log(`Returning ${tracks.length} tracks`);
@@ -498,10 +572,9 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("Suggestions error:", error);
-    // Return fallback tracks on error - with rotation
-    const halfHourSeed = Math.floor(Date.now() / (1000 * 60 * 30));
+    const seed15min = Math.floor(Date.now() / (1000 * 60 * 15));
     return new Response(
-      JSON.stringify({ tracks: getFallbackTracks(undefined, halfHourSeed).slice(0, 20) }),
+      JSON.stringify({ tracks: getFallbackTracks(undefined, seed15min).slice(0, 20) }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }

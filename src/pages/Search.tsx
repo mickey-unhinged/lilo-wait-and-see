@@ -37,19 +37,21 @@ const moods = [
   { id: "6", name: "Party", emoji: "🎉", color: "from-fuchsia-500 to-pink-500" },
 ];
 
-// Dynamic trending searches that rotate based on time
+// Dynamic trending searches that rotate every 30 minutes
 const getTrendingSearches = () => {
   const allTrending = [
-    ["Taylor Swift", "Drake", "The Weeknd", "Bad Bunny", "Morgan Wallen", "SZA"],
-    ["Beyoncé", "Kendrick Lamar", "Doja Cat", "Post Malone", "Dua Lipa", "Ed Sheeran"],
-    ["Billie Eilish", "Harry Styles", "Olivia Rodrigo", "Travis Scott", "Ariana Grande", "Justin Bieber"],
-    ["Rihanna", "Bruno Mars", "Cardi B", "Lil Baby", "21 Savage", "Future"],
-    ["Miley Cyrus", "Lizzo", "Jack Harlow", "Ice Spice", "Metro Boomin", "Tyler, The Creator"],
-    ["BTS", "BLACKPINK", "NewJeans", "Stray Kids", "Seventeen", "aespa"],
+    ["Taylor Swift", "Drake", "The Weeknd", "Bad Bunny", "SZA", "Dua Lipa"],
+    ["Beyoncé", "Kendrick Lamar", "Doja Cat", "Post Malone", "Ed Sheeran", "Harry Styles"],
+    ["Billie Eilish", "Olivia Rodrigo", "Travis Scott", "Ariana Grande", "Justin Bieber", "Miley Cyrus"],
+    ["BTS", "BLACKPINK", "NewJeans", "Stray Kids", "aespa", "TWICE"],
+    ["Espresso", "Beautiful Things", "Flowers", "Anti-Hero", "Vampire", "Cruel Summer"],
+    ["Bruno Mars", "Cardi B", "21 Savage", "Metro Boomin", "Tyler, The Creator", "Peso Pluma"],
+    ["Sabrina Carpenter", "Benson Boone", "Hozier", "Teddy Swims", "Shaboozey", "Tate McRae"],
+    ["Bad Bunny", "Karol G", "Shakira", "Maluma", "Rauw Alejandro", "Feid"],
   ];
   
-  // Rotate every 2 hours
-  const rotationIndex = Math.floor(Date.now() / (1000 * 60 * 120)) % allTrending.length;
+  // Rotate every 30 minutes for more variety
+  const rotationIndex = Math.floor(Date.now() / (1000 * 60 * 30)) % allTrending.length;
   return allTrending[rotationIndex];
 };
 

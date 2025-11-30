@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { Sparkles, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Track, usePlayer } from "@/contexts/PlayerContext";
@@ -39,19 +39,20 @@ export function DailyMixSection() {
   const [error, setError] = useState<string | null>(null);
   const [seeds, setSeeds] = useState<string[]>([]);
   const { playTrack, setQueue } = usePlayer();
+  const sessionSeed = useRef(Math.floor(Math.random() * 1000) + 200);
 
   useEffect(() => {
     const seedArtists = getSeedArtists();
     setSeeds(seedArtists);
     fetchRecommendations(seedArtists);
-    
-    // Refresh every 20 minutes for variety
+
+    // Refresh every 10 minutes for variety
     const interval = setInterval(() => {
       const newSeeds = getSeedArtists();
       setSeeds(newSeeds);
       fetchRecommendations(newSeeds);
-    }, 20 * 60 * 1000);
-    
+    }, 10 * 60 * 1000);
+
     return () => clearInterval(interval);
   }, []);
 
@@ -67,11 +68,12 @@ export function DailyMixSection() {
     setError(null);
     try {
       const searchTerms = extractKeywordsFromHistory();
-      
+
       const body = {
         type: "personalized",
         seedArtists,
         searchTerms,
+        sectionOffset: sessionSeed.current,
         limit: 12,
       };
 

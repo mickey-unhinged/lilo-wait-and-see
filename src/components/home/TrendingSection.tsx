@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { SectionHeader } from "./SectionHeader";
 import { HorizontalScroll } from "./HorizontalScroll";
 import { TrackCard } from "./TrackCard";
@@ -10,13 +10,15 @@ export function TrendingSection() {
   const [trendingTracks, setTrendingTracks] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { currentTrack, isPlaying, playTrack, setQueue } = usePlayer();
+  const sessionSeed = useRef(Math.floor(Math.random() * 1000));
 
-  // Fetch trending from API
   useEffect(() => {
     const fetchTrending = async () => {
       setIsLoading(true);
       try {
-        const { data, error } = await supabase.functions.invoke("trending-suggestions");
+        const { data, error } = await supabase.functions.invoke("trending-suggestions", {
+          body: { sectionOffset: sessionSeed.current }
+        });
 
         if (error) throw error;
 
@@ -32,8 +34,8 @@ export function TrendingSection() {
 
     fetchTrending();
 
-    // Refresh every 10 minutes
-    const interval = setInterval(fetchTrending, 10 * 60 * 1000);
+    // Refresh every 8 minutes for more dynamic feel
+    const interval = setInterval(fetchTrending, 8 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
